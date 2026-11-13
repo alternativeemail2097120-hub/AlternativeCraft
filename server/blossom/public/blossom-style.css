@@ -1,0 +1,2097 @@
+/* BLOSSOM (update 146) - platform chrome (same as the other games) + the original flower board, slots, feed and leaderboard styles recoloured with the platform theme tokens. */
+/* ============================================================
+   NUMBERBLINDLE — design tokens
+   ============================================================ */
+/* Backgrounds/surfaces/borders/ink now follow the platform's shared
+   theme picker (/shared/theme.css, loaded before this file) instead of
+   being hardcoded, so choosing a theme anywhere on the platform recolors
+   NUMBERBLINDLE too. Gold/coral/success/violet stay as NUMBERBLINDLE's own fixed
+   accent identity, same as Flagle/TRAVLE keep their bold accent colors.
+   --panel and --panel-light are deliberately two DIFFERENT shades (a
+   light elevated card, then a visibly deeper nested-panel tone) so
+   panels-within-panels actually separate from each other instead of
+   blending into one flat color. --text is body-text ink; --muted is a
+   softer secondary tone that stays legible without competing with --text. */
+:root {
+  --bg-stage: var(--theme-bg, #0d0f1f);
+  --panel: var(--theme-card, #171b3d);
+  --panel-light: var(--theme-surface-2, #212656);
+  --gold: #ffb100;
+  --gold-dim: #d99400;
+  --gold-text: #8A5A00; /* readable-as-TEXT variant of --gold — bright gold used for text on a light bg fails contrast; use this for labels/badges, keep --gold for solid-fill backgrounds/icons/borders */
+  --coral: #ff3b4e;
+  --success: #16d976;
+  --success-text: #0F7A3D; /* readable-as-TEXT variant of --success — same reasoning as --gold-text */
+  --violet: #7c5cff;
+  --text: var(--theme-ink, #f6f4ef);
+  --muted: var(--theme-ink-soft, #9aa0c3);
+  --heading: var(--theme-deep, #f6f4ef);
+  --border: var(--theme-line, rgba(60, 40, 20, 0.278));
+  --shadow: 0 14px 32px var(--theme-shadow, rgba(2, 3, 12, 0.35));
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-stage);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  height: calc(var(--vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -8%, rgba(255, 177, 0, 0.16), transparent 60%),
+    radial-gradient(ellipse 700px 400px at 100% 110%, rgba(255, 59, 78, 0.11), transparent 60%),
+    var(--bg-stage);
+}
+
+button, input, select { font-family: var(--font-body); color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Extra top padding reserves space for TikTok LIVE's own on-screen UI
+     (viewer name, live badge, gift/exit icons) so it never covers the
+     top bar — see --live-safe-top in /shared/theme.css. */
+  padding: calc(8px + var(--live-safe-top)) 10px 8px;
+  background: rgba(20, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  /* Single row, always - see .toolbarRow below for how every control in
+     it is sized to actually fit alongside the brand at ordinary 100%
+     zoom, with nothing wrapping, scrolling, or hidden off-screen. */
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.brandRow { display: flex; align-items: center; gap: 6px; min-width: 0; flex-shrink: 1; }
+.brandDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(60, 40, 20, 0.163);
+}
+.brandDot.live { background: var(--success); box-shadow: 0 0 0 3px rgba(22, 217, 118, 0.18); }
+.brandDot.test_mode { background: var(--violet); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18); }
+.brandDot.connecting, .brandDot.retrying { background: var(--gold); animation: pulse 1.1s ease-in-out infinite; }
+.brandDot.error { background: var(--coral); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.brandTitle {
+  font-family: var(--font-display); font-weight: 700; font-size: 15px; line-height: 1.1; color: var(--heading);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brandTitle .accent { color: var(--gold-text); text-shadow: 0 0 18px rgba(255, 177, 0, 0.45); }
+/* The tagline is dropped from the compact single-row header (see
+   .toolbarRow below) so the row has room for every button - it isn't
+   needed to understand or play the game. Markup is left in place rather
+   than deleted in case a future wider layout wants it back. */
+.brandSubtitle { display: none; }
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+/* Everything in the toolbar (icons + the two badges) is sized down
+   specifically HERE, scoped to .toolbarRow only, so nothing elsewhere
+   in the app (drawer close buttons, celebration close button, etc.)
+   is affected - only this one row needs to be this compact to fit
+   home + hint + help + leaderboard + settings + fullscreen, the mode
+   badge, and the length badge on a single line without wrapping,
+   scrolling, or relying on the browser being zoomed out. */
+.toolbarRow .modeBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(124, 92, 255, 0.16);
+  color: var(--violet);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.toolbarRow .modeBadge.live { background: rgba(22, 217, 118, 0.16); color: var(--success-text); }
+.toolbarRow .modeBadge.offline { background: rgba(60, 40, 20, 0.255); color: var(--muted); }
+
+.toolbarRow .lengthBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(60, 40, 20, 0.186);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbarRow .iconBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(60, 40, 20, 0.117);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.iconBtn:active { transform: scale(0.94); }
+.iconBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+.iconBtn.active { background: rgba(255, 177, 0, 0.18); border-color: rgba(255, 177, 0, 0.4); color: var(--gold-text); }
+.iconBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--gold);
+  color: #241a05;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+}
+.iconBadge.hidden { display: none; }
+
+.toastSlot {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  height: var(--toast-slot-height, 76px);
+  pointer-events: none;
+}
+/* ============================================================
+   Host controls (sticky bottom)
+   ============================================================ */
+.controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  background: rgba(20, 23, 42, 0.97);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -14px 32px rgba(4, 5, 14, 0.5);
+}
+.controlsHandle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px;
+}
+.handleArrow { transition: transform 0.2s ease; }
+.controlsHandle[aria-expanded="false"] .handleArrow { transform: rotate(-90deg); }
+.controlsBody { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin: 0 auto; }
+.controlsBody.collapsed { display: none; }
+.modeControls[hidden] { display: none; }
+.row { display: flex; gap: 8px; align-items: center; }
+.textInput, .selectInput {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+.selectNarrow { flex: 0 0 84px; }
+.textInput::placeholder { color: var(--muted); }
+.btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btnPrimary { background: var(--coral); color: #260f0c; }
+.btnGold { background: var(--gold); color: #241a05; }
+.btnGhost { background: rgba(60, 40, 20, 0.186); color: var(--text); border: 1px solid var(--border); }
+.btnDanger { background: rgba(255, 59, 78, 0.14); color: #7A1620; border: 1px solid rgba(255, 59, 78, 0.4); margin-bottom: 8px; }
+.btnFull { width: 100%; }
+.miniStatus { margin: 0; font-size: 12px; color: var(--muted); min-height: 16px; }
+
+/* ============================================================
+   Drawers (Settings / Leaderboard) — slide in from the right
+   ============================================================ */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.6);
+  backdrop-filter: blur(3px);
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+.drawerOverlay[hidden] { display: none; }
+.drawer {
+  width: 100%;
+  max-width: 400px;
+  height: 100%;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 18px 18px 32px;
+  overflow-y: auto;
+  animation: drawer-in 0.22s ease;
+}
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0.5; } to { transform: translateX(0); opacity: 1; } }
+.drawerHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.drawerHead h3 { margin: 0; font-family: var(--font-display); font-size: 19px; color: var(--heading); }
+
+.statusChips { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.statusChip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.statusChip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.statusChip.good .dot { background: var(--success); }
+.statusChip.bad .dot { background: var(--coral); }
+.statusChip.warn .dot { background: var(--gold); }
+
+.drawerSection { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.drawerSection:last-child { border-bottom: none; }
+.drawerSection h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sectionNote { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.fieldLabel { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+.delayLabel { flex: 1; margin-bottom: 0; }
+
+.pickerRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.chev { color: var(--muted); }
+
+.linkBtn { background: none; border: none; color: var(--muted); font-size: 11px; text-transform: none; letter-spacing: 0; cursor: pointer; padding: 2px 4px; }
+
+.diagGrid { display: grid; grid-template-columns: 1fr; gap: 8px; font-size: 12.5px; }
+.diagRow { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.diagRow:last-child { border-bottom: none; }
+.diagKey { color: var(--muted); }
+.diagVal { font-weight: 600; text-align: right; }
+.diagVal.warn { color: var(--gold-text); }
+.diagVal.bad { color: #C81E36; font-weight: 700; }
+.diagVal.good { color: var(--success-text); }
+
+.switchRow { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.switchRow input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switchTrack { width: 38px; height: 22px; border-radius: 999px; background: rgba(60, 40, 20, 0.301); position: relative; flex-shrink: 0; transition: background 0.2s ease; }
+.switchThumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--text); transition: transform 0.2s ease; }
+.switchRow input:checked + .switchTrack { background: var(--gold); }
+.switchRow input:checked + .switchTrack .switchThumb { transform: translateX(16px); background: #241a05; }
+.switchLabel { flex: 1; }
+
+/* ---- Mode picker popup ---- */
+.pickerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.6);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.pickerOverlay[hidden] { display: none; }
+.pickerSheet {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.pickerOption {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  text-align: left;
+  color: var(--text);
+}
+.pickerOption:last-child { border-bottom: none; }
+.pickerRadio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  flex-shrink: 0;
+  position: relative;
+}
+.pickerOption.selected .pickerRadio { border-color: var(--gold); }
+.pickerOption.selected .pickerRadio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.pickerTextWrap { display: flex; flex-direction: column; gap: 2px; }
+.pickerTitle { font-weight: 700; font-size: 14px; }
+.pickerDesc { font-size: 12px; color: var(--muted); }
+
+/* ---- Leaderboard tabs ---- */
+.tabRow { display: flex; gap: 8px; margin-bottom: 14px; }
+.tabBtn {
+  flex: 1;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tabBtn.active { background: var(--gold); color: #241a05; border-color: transparent; }
+
+.leaderboard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.leaderboard li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); background: rgba(60, 40, 20, 0.094); font-size: 14px; }
+.leaderboard li.empty { color: var(--muted); justify-content: center; background: none; text-align: center; }
+.leaderboard .rank { font-family: var(--font-display); font-weight: 700; color: var(--gold-dim); width: 20px; flex-shrink: 0; }
+.leaderboard li:nth-child(1) .rank { color: var(--gold-text); }
+.leaderboard .lbName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard .lbScore { font-weight: 700; }
+
+/* ============================================================
+   How-to-play modal
+   ============================================================ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 80;
+}
+.modalOverlay[hidden] { display: none; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+@media (min-width: 560px) {
+  .modalOverlay { align-items: center; }
+  .modal { border-radius: 20px; }
+}
+.modalHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.modalHead h3 { margin: 0; font-family: var(--font-display); font-size: 18px; color: var(--heading); }
+.howToList { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--muted); }
+.howToList li strong { color: var(--text); }
+.legendTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 12px;
+  margin-right: 4px;
+}
+.legendTile.correct { background: var(--success); color: #08301a; }
+.legendTile.present { background: var(--gold); color: #2c1f04; }
+.legendTile.absent { background: rgba(255, 59, 78, 0.28); color: #7A1620; }
+
+@media (min-width: 720px) {
+  .stage { padding: 22px 16px 30px; }
+  .tile { width: 44px; height: 50px; font-size: 22px; }
+}
+
+/* Extra safety margin on genuinely tiny screens (very old/small phones)
+   so the toolbar row still fits without wrapping or scrolling. */
+@media (max-width: 340px) {
+  .topbar { padding: 6px 8px; gap: 4px; }
+  .toolbarRow { gap: 2px; }
+  .toolbarRow .iconBtn { width: 23px; height: 23px; font-size: 11px; border-radius: 7px; }
+  .toolbarRow .modeBadge, .toolbarRow .lengthBadge { font-size: 8px; padding: 2px 5px; }
+  .brandTitle { font-size: 13px; }
+  .brandDot { width: 7px; height: 7px; }
+}
+
+/* ============================================================
+   Win celebration confetti
+   ============================================================ */
+.confettiLayer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  overflow: hidden;
+}
+.confettiPiece {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(540deg); opacity: 0.3; }
+}
+
+/* ============================================================
+   Win celebration: sequence of centered floating windows
+   ============================================================ */
+.celebrationOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 5, 14, 0.72);
+  backdrop-filter: blur(4px);
+}
+.celebrationOverlay[hidden] { display: none; }
+
+.celebrationCard {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: linear-gradient(180deg, var(--panel-light), var(--panel));
+  border: 1px solid rgba(255, 177, 0, 0.4);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px rgba(255, 177, 0, 0.08), 0 30px 60px rgba(2, 3, 12, 0.7);
+  padding: 30px 22px 20px;
+  text-align: center;
+  animation: celeb-pop 0.32s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+@keyframes celeb-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrationClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.celebrationBody { min-height: 140px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+
+.celebLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+.celebWinnerRow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text);
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.celebAnswerRow {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: 0.03em;
+  color: var(--success-text);
+  text-shadow: 0 0 22px rgba(22, 217, 118, 0.4);
+  word-break: break-word;
+  margin-top: 2px;
+}
+.celebPoints { font-size: 13px; color: var(--gold-dim); font-weight: 600; }
+
+.celebBoardTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.celebBoardList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.celebBoardList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(60, 40, 20, 0.117);
+  font-size: 14px;
+}
+.celebBoardList li.empty { color: var(--muted); justify-content: center; text-align: center; }
+.celebBoardList .rank { font-family: var(--font-display); font-weight: 700; color: var(--gold-dim); width: 20px; flex-shrink: 0; }
+.celebBoardList li:nth-child(1) .rank { color: var(--gold-text); }
+.celebBoardList .lbName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.celebBoardList .lbScore { font-weight: 700; }
+
+.celebrationDots { display: flex; justify-content: center; gap: 6px; margin-top: 18px; }
+.celebDot { width: 6px; height: 6px; border-radius: 50%; background: rgba(60, 40, 20, 0.42); }
+.celebDot.active { background: var(--gold); }
+
+
+/* ===== BLOSSOM game styles (from the original game) ===== */
+:root {
+  --vh: 1vh;
+  --font: "Fredoka", "Baloo 2", ui-rounded, "Arial Rounded MT Bold", "Segoe UI", system-ui, sans-serif;
+  --ink: var(--theme-ink);
+  --ink-soft: var(--theme-ink-soft);
+  --cream: var(--theme-card);
+  --strawberry: var(--hero-accent, #7B5EA7);
+  --strawberry-deep: var(--theme-deep);
+  --butter: #ffd75e; --mint: #8ee6c8; --sky: #8ed2ff; --peach: #ffb58a; --lilac: #c9b6ff;
+  --sh: 120, 60, 150;
+  --surface2: var(--theme-card);
+  --well-bg: var(--theme-surface-2);
+  --accent-light: color-mix(in srgb, var(--hero-accent, #7B5EA7) 45%, #fff);
+  --butter-soft: #fff1b8; --butter-edge: #e6b526; --butter-deep: #e39a00; --butter-deeper: #b86f00;
+  --danger-soft: #fff0f0;
+  --bar-rgb: 255, 249, 252;
+  --plate-a: var(--theme-card);
+  --plate-b: var(--theme-surface-2);
+  --plate-c: color-mix(in srgb, var(--hero-accent, #7B5EA7) 30%, #fff);
+}
+button, input { font-family: var(--font); }
+
+/* ---------- reusable clay surface ---------- */
+#rulesLegend, #progress, #bonusWrap, #leaderboardWrap, #diagnostics {
+  margin: 0 12px;
+  background: var(--cream);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -5px 10px rgba(var(--sh), 0.13),
+    0 8px 18px rgba(var(--sh), 0.2);
+}
+
+/* ---------- rules ----------
+   Locked to exactly two lines on phones: the copy is short enough to fit at
+   this size on typical phone widths, and the clamp is a hard backstop so it
+   can never grow to a third line even on a very narrow screen. */
+#rulesLegend {
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.36;
+  font-weight: 500;
+  padding: 8px 16px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+#rulesLegend span { font-weight: 700; }
+@media (max-width: 360px) {
+  #rulesLegend { font-size: 12.5px; padding: 7px 12px; }
+}
+#centerCallout {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--strawberry);
+  color: #fff;
+  text-shadow: 0 1px 0 var(--strawberry-deep);
+}
+#lenRange { color: var(--strawberry-deep); }
+
+/* ---------- the mochi board ---------- */
+#flower {
+  /* Sized off both viewport width AND height so it shrinks on short phone
+     screens too — this is what keeps the instructions, live-feed slot,
+     letters, secret-word boxes and bonus count all on screen together
+     without scrolling on most phones. */
+  --flower: min(66vw, calc(var(--vh, 1vh) * 34), 300px);
+  position: relative;
+  width: var(--flower);
+  height: var(--flower);
+  margin: 2px auto 4px auto;
+}
+
+/* the round plate the mochi sit on */
+#flower::before {
+  content: "";
+  position: absolute;
+  inset: 1%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, var(--plate-a) 0%, var(--plate-b) 45%, var(--plate-c) 100%);
+  box-shadow:
+    inset 0 6px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -14px 22px rgba(var(--sh), 0.16),
+    0 16px 0 -4px rgba(217, 70, 138, 0.22),
+    0 24px 28px rgba(var(--sh), 0.28);
+}
+
+.mochi {
+  position: absolute;
+  animation: bob 3.8s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+.mochi .ground {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -6%;
+  height: 14%;
+  border-radius: 50%;
+  background: rgba(var(--sh), 0.3);
+  filter: blur(4px);
+}
+
+.mochi .body {
+  position: absolute;
+  inset: 0;
+  border-radius: 48% 48% 50% 50% / 56% 56% 44% 44%;
+  background:
+    radial-gradient(90% 70% at 30% 20%, var(--hi) 0%, transparent 60%),
+    radial-gradient(110% 110% at 50% 95%, var(--c2) 0%, var(--c1) 75%);
+  box-shadow:
+    inset 0 -10px 14px var(--deep),
+    inset 0 5px 7px rgba(255, 255, 255, 0.7),
+    0 8px 12px -3px var(--deep);
+  transform-origin: 50% 90%;
+}
+
+/* glossy highlight */
+.mochi .body::before {
+  content: "";
+  position: absolute;
+  top: 8%;
+  left: 14%;
+  width: 34%;
+  height: 15%;
+  border-radius: 50%;
+  background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.15));
+  transform: rotate(-26deg);
+}
+
+.mochi .eye {
+  position: absolute;
+  top: 23%;
+  width: 11%;
+  height: 15%;
+  border-radius: 50%;
+  background: #3b1f4d;
+  transform-origin: 50% 60%;
+  animation: blink 5.5s infinite;
+  animation-delay: var(--d, 0s);
+}
+.mochi .eye::after {
+  content: "";
+  position: absolute;
+  top: 16%;
+  left: 20%;
+  width: 38%;
+  height: 34%;
+  border-radius: 50%;
+  background: #fff;
+}
+.mochi .eye.l { left: 27%; }
+.mochi .eye.r { right: 27%; }
+
+.mochi .cheek {
+  position: absolute;
+  top: 37%;
+  width: 15%;
+  height: 8%;
+  border-radius: 50%;
+  background: rgba(255, 96, 150, 0.5);
+  filter: blur(1px);
+}
+.mochi .cheek.l { left: 12%; }
+.mochi .cheek.r { right: 12%; }
+
+.mochi .mouth {
+  position: absolute;
+  top: 34%;
+  left: 42%;
+  width: 16%;
+  height: 7%;
+  border-bottom: 3px solid #3b1f4d;
+  border-radius: 0 0 50% 50%;
+}
+
+.mochi .ch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 49%;
+  text-align: center;
+  font-size: calc(var(--flower) * 0.11);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--ink-c, var(--ink));
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.75);
+  user-select: none;
+}
+
+/* mochi colors: highlight, light, mid, shade, letter ink — shared with the
+   .robo family below so both mascot families draw from the same 6 friend
+   colors + center, even though their shapes are completely different. */
+.mochi.mint,     .robo.mint     { --hi: #f4fffa; --c1: #b4f2dc; --c2: #6fd8b2; --deep: rgba(30, 140, 110, 0.4);  --ink-c: #1b6650; }
+.mochi.lavender, .robo.lavender { --hi: #f7f3ff; --c1: #d6c8ff; --c2: #a58cf3; --deep: rgba(90, 60, 190, 0.38);  --ink-c: #47309c; }
+.mochi.peach,    .robo.peach    { --hi: #fff5ee; --c1: #ffd3b4; --c2: #ffa276; --deep: rgba(200, 90, 40, 0.36);  --ink-c: #8f3f1c; }
+.mochi.sky,      .robo.sky      { --hi: #f2fbff; --c1: #b4e1ff; --c2: #6fbbf6; --deep: rgba(30, 100, 190, 0.36); --ink-c: #1b5a98; }
+.mochi.butter,   .robo.butter   { --hi: #fffce8; --c1: #fff0a0; --c2: #ffd54f; --deep: rgba(190, 140, 0, 0.36);  --ink-c: #7c5800; }
+.mochi.bubble,   .robo.bubble   { --hi: #fff2f8; --c1: #ffc2dc; --c2: #ff8abf; --deep: rgba(200, 50, 120, 0.36); --ink-c: #9a2f66; }
+.mochi.center,   .robo.center   { --hi: #fff4f8; --c1: #ff9ec6; --c2: #ff5fa2; --deep: rgba(190, 30, 100, 0.45); --ink-c: #ffffff; }
+.mochi.center .ch { text-shadow: 0 2px 0 #c2337a, 0 4px 6px rgba(120, 10, 60, 0.35); font-size: calc(var(--flower) * 0.14); }
+.mochi.center .body { box-shadow: inset 0 -12px 16px var(--deep), inset 0 6px 8px rgba(255, 255, 255, 0.7), 0 0 0 5px rgba(255, 255, 255, 0.55), 0 10px 14px -2px var(--deep); }
+.mochi.center { z-index: 5; }
+
+/* the bow on the center mochi marks "use this letter" */
+.bow {
+  position: absolute;
+  left: 50%;
+  top: -12%;
+  width: 54%;
+  height: 26%;
+  transform: translateX(-50%);
+  z-index: 3;
+  filter: drop-shadow(0 3px 2px rgba(150, 90, 0, 0.3));
+}
+.bow i {
+  position: absolute;
+  top: 6%;
+  width: 52%;
+  height: 84%;
+  background: radial-gradient(circle at 35% 28%, #fff6bd, #ffd54f 55%, #f2b21f);
+}
+.bow i:first-child { left: 0; border-radius: 55% 12% 12% 55%; transform: rotate(-18deg); }
+.bow i:nth-child(2) { right: 0; border-radius: 12% 55% 55% 12%; transform: rotate(18deg); }
+.bow b {
+  position: absolute;
+  left: 36%;
+  top: 22%;
+  width: 28%;
+  height: 56%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6bd, #ffd54f 60%, #e9a812);
+  box-shadow: inset 0 -2px 3px rgba(150, 90, 0, 0.3);
+}
+
+.mochi .body.boing { animation: boing 0.6s cubic-bezier(0.3, 1.5, 0.5, 1); }
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3.5%); }
+}
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95.5% { transform: scaleY(0.1); }
+}
+@keyframes boing {
+  0% { transform: scale(1, 1); }
+  28% { transform: scale(1.14, 0.84); }
+  58% { transform: scale(0.94, 1.1); }
+  100% { transform: scale(1, 1); }
+}
+
+/* ---------- board friends: 7 more species alongside mochi ----------
+   Every species reuses .mochi's body/eyes/cheeks/mouth/letter and its
+   bob / blink / boing animations — only the silhouette (ears, patches,
+   beak...) and, for cloud/star, the body shape itself change. All extra
+   parts are positioned inside .body so they inherit that critter's pastel
+   color (--hi/--c1/--c2/--deep) automatically, keeping every species just
+   as varied and candy-colored as mochi. */
+
+/* -- ears, shared base (bear / cat / bunny / panda) -- */
+.mochi .ear {
+  position: absolute;
+  top: -15%;
+  width: 30%;
+  height: 30%;
+  background: radial-gradient(70% 70% at 35% 30%, var(--hi) 0%, var(--c1) 55%, var(--c2) 100%);
+  box-shadow: inset 0 -4px 6px var(--deep);
+}
+.mochi .ear.l { left: -6%; }
+.mochi .ear.r { right: -6%; }
+
+/* bear: round teddy ears */
+.mochi.theme-bear .ear { border-radius: 50%; }
+.mochi.theme-bear .ear::after {
+  content: "";
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  background: var(--c1);
+  opacity: 0.65;
+}
+
+/* cat: pointed ears + whiskers + nose */
+.mochi.theme-cat .ear {
+  width: 26%; height: 28%; top: -17%;
+  clip-path: polygon(50% 0%, 6% 100%, 94% 100%);
+}
+.mochi.theme-cat .ear.l { left: 0%; transform: rotate(-10deg); }
+.mochi.theme-cat .ear.r { right: 0%; transform: rotate(10deg); }
+.mochi.theme-cat .ear::after {
+  content: "";
+  position: absolute;
+  left: 26%; right: 26%; bottom: 10%; top: 34%;
+  background: var(--c1);
+  opacity: 0.7;
+  clip-path: polygon(50% 0%, 10% 100%, 90% 100%);
+}
+.mochi.theme-cat .whisker {
+  position: absolute;
+  top: 45%;
+  width: 20%;
+  height: 2px;
+  background: rgba(59, 31, 77, 0.45);
+  border-radius: 2px;
+}
+.mochi.theme-cat .whisker.l { left: -16%; transform: rotate(-8deg); box-shadow: 0 6px 0 rgba(59, 31, 77, 0.35), 0 -6px 0 rgba(59, 31, 77, 0.35); }
+.mochi.theme-cat .whisker.r { right: -16%; transform: rotate(8deg); box-shadow: 0 6px 0 rgba(59, 31, 77, 0.35), 0 -6px 0 rgba(59, 31, 77, 0.35); }
+.mochi.theme-cat .nose {
+  position: absolute;
+  top: 30%; left: 47%;
+  width: 6%; height: 5%;
+  background: rgba(59, 31, 77, 0.55);
+  clip-path: polygon(50% 100%, 5% 0%, 95% 0%);
+}
+
+/* bunny: tall swaying ears */
+.mochi.theme-bunny .ear {
+  width: 15%; height: 48%; top: -42%;
+  border-radius: 50% 50% 40% 40%;
+  transform-origin: 50% 100%;
+  animation: earSway 3.6s ease-in-out infinite;
+}
+.mochi.theme-bunny .ear.l { left: 15%; animation-delay: 0s; }
+.mochi.theme-bunny .ear.r { right: 15%; animation-delay: 0.25s; }
+.mochi.theme-bunny .ear::after {
+  content: "";
+  position: absolute;
+  inset: 16% 30%;
+  border-radius: 50%;
+  background: rgba(255, 130, 165, 0.55);
+}
+@keyframes earSway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* panda: round ears + dark eye patches, always black/white regardless of
+   this critter's pastel slot, so it always reads as a panda */
+.mochi.theme-panda .ear {
+  border-radius: 50%;
+  background: linear-gradient(#4b4b58, #26262e);
+  box-shadow: none;
+}
+.mochi.theme-panda .patch {
+  position: absolute;
+  top: 15%;
+  width: 22%; height: 26%;
+  border-radius: 50%;
+  background: rgba(38, 38, 46, 0.88);
+}
+.mochi.theme-panda .patch.l { left: 12%; }
+.mochi.theme-panda .patch.r { right: 12%; }
+
+/* chick: head tuft + beak */
+.mochi.theme-chick .tuft {
+  position: absolute;
+  top: -10%; left: 44%;
+  width: 12%; height: 16%;
+  background: var(--c2);
+  border-radius: 50% 50% 0 50%;
+  transform: rotate(-20deg);
+}
+.mochi.theme-chick .beak {
+  position: absolute;
+  top: 38%; left: 42%;
+  width: 16%; height: 10%;
+  background: linear-gradient(#ffcf6b, #ffab2e);
+  clip-path: polygon(0% 20%, 100% 0%, 100% 100%, 0% 80%);
+}
+.mochi.theme-chick .mouth { display: none; }
+
+/* cloud: puffy lobed silhouette — two extra rounded lobes (added as .puff
+   elements, same trick as ears) tucked behind the main round body so the
+   outline reads as a fluffy cloud instead of a plain circle */
+.mochi.theme-cloud .body { border-radius: 50%; }
+.mochi.theme-cloud .puff {
+  position: absolute;
+  top: -14%;
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  background: radial-gradient(70% 70% at 35% 30%, var(--hi) 0%, var(--c1) 55%, var(--c2) 100%);
+  box-shadow: inset 0 -6px 8px var(--deep);
+}
+.mochi.theme-cloud .puff.l { left: -8%; }
+.mochi.theme-cloud .puff.r { right: -8%; }
+.mochi.theme-cloud .ground { opacity: 0.7; }
+
+/* star: five-point body via clip-path instead of a rounded blob */
+.mochi.theme-star .body {
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 64% 34%, 100% 36%, 72% 58%, 82% 92%, 50% 72%, 18% 92%, 28% 58%, 0% 36%, 36% 34%);
+  box-shadow: none;
+}
+.mochi.theme-star .body::before { display: none; }
+.mochi.theme-star .eye { top: 40%; }
+.mochi.theme-star .cheek { top: 52%; }
+.mochi.theme-star .mouth { top: 50%; }
+.mochi.theme-star .ch { top: 62%; }
+.mochi.theme-star .ground { bottom: -10%; }
+
+/* ---------- ROBO board friends: second, structurally different mascot
+   family (robot / alien / drone) ----------
+   Nothing here reuses .mochi. Different silhouette (rounded-square or disc
+   chassis instead of a soft round blob), different shading (a flat diagonal
+   gradient + skewed sheen bar instead of a radial highlight), different
+   face (a dark glowing visor instead of drawn eyes/cheeks/mouth on the body
+   itself), different headgear (an antenna or spinning fins instead of
+   ears), and its own float/blink motion. The letter always sits on its own
+   light "chest plate" well below the visor, in the app's fixed dark ink —
+   never inside or overlapping the visor/eyes/antenna — so decoration can
+   never crowd out the letter. */
+
+.robo {
+  position: absolute;
+  animation: roboFloat 4.2s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+.robo .foot {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: -6%;
+  height: 10%;
+  border-radius: 40%;
+  background: rgba(var(--sh), 0.3);
+  filter: blur(4px);
+}
+
+.robo .body {
+  position: absolute;
+  inset: 6% 3% 0 3%;
+  border-radius: 26% 26% 30% 30% / 32% 32% 22% 22%;
+  background: linear-gradient(155deg, var(--hi) 0%, var(--c1) 45%, var(--c2) 100%);
+  box-shadow:
+    inset 0 -9px 12px var(--deep),
+    inset 0 4px 6px rgba(255, 255, 255, 0.6),
+    0 8px 12px -3px var(--deep);
+  overflow: hidden;
+}
+
+/* flat diagonal sheen instead of mochi's soft round highlight */
+.robo .body::before {
+  content: "";
+  position: absolute;
+  top: -10%;
+  left: -20%;
+  width: 38%;
+  height: 140%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  transform: skewX(-16deg);
+}
+
+.robo .bolt {
+  position: absolute;
+  top: 32%;
+  width: 8%;
+  height: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, var(--c2) 75%);
+  box-shadow: inset 0 -2px 2px var(--deep);
+}
+.robo .bolt.l { left: 1%; }
+.robo .bolt.r { right: 1%; }
+
+/* the visor: a dark glowing band that holds the eyes and a small mouth LED —
+   entirely separate from the letter, which lives lower down on the plate */
+.robo .visor {
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  top: 20%;
+  height: 24%;
+  border-radius: 40% 40% 35% 35% / 65% 65% 35% 35%;
+  background: linear-gradient(160deg, #2c2542, #14101f);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), inset 0 -2px 3px rgba(255, 255, 255, 0.06);
+}
+.robo .visor .rEye {
+  position: absolute;
+  top: 28%;
+  width: 16%;
+  height: 42%;
+  border-radius: 2px;
+  background: var(--robo-eye, #7be0ff);
+  box-shadow: 0 0 6px 1px var(--robo-eye, #7be0ff);
+  animation: roboBlink 5.4s infinite;
+  animation-delay: var(--d, 0s);
+}
+.robo .visor .rEye.l { left: 21%; }
+.robo .visor .rEye.r { right: 21%; }
+.robo .visor .rMouth {
+  position: absolute;
+  left: 38%;
+  right: 38%;
+  bottom: 16%;
+  height: 10%;
+  border-radius: 2px;
+  background: var(--robo-eye, #7be0ff);
+  opacity: 0.75;
+}
+
+/* antenna (robot) — a single stalk with a blinking tip light */
+.robo .antenna {
+  position: absolute;
+  top: -18%;
+  left: 50%;
+  width: 5%;
+  height: 20%;
+  border-radius: 3px;
+  background: var(--c2);
+  transform-origin: 50% 100%;
+  animation: antennaWag 3.4s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.robo .antenna::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: 50%;
+  width: 160%;
+  height: 55%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #fff6bd;
+  box-shadow: 0 0 6px 2px rgba(255, 230, 120, 0.9);
+  animation: antennaBlink 2.6s infinite;
+}
+
+/* the chest plate that always carries the letter, well clear of the visor */
+.robo .plate {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 54%;
+  height: 30%;
+  border-radius: 30%;
+  background: linear-gradient(160deg, #fffefb, var(--hi));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), inset 0 -3px 5px rgba(var(--sh), 0.15);
+}
+.robo .ch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 59%;
+  text-align: center;
+  font-size: calc(var(--flower) * 0.1);
+  line-height: 1;
+  font-weight: 700;
+  /* the plate stays light even in the Dark/Midnight app themes, so the
+     letter uses the same fixed per-color-slot ink as mochi's letter
+     (--ink-c, set alongside --hi/--c1/--c2 above) instead of the global
+     theme ink — otherwise it would turn light-on-light in those themes */
+  color: var(--ink-c, var(--ink));
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
+  user-select: none;
+}
+/* robo's plate is always a light panel (even for the "center" friend, whose
+   mochi counterpart instead paints its letter straight onto a saturated
+   body and so needs mochi.center's white --ink-c) — so robo.center keeps
+   its own fixed dark ink here rather than inheriting that white. */
+.robo.center .ch { font-size: calc(var(--flower) * 0.125); color: #9a2f66; }
+.robo.center { z-index: 5; }
+
+@keyframes roboFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4%) rotate(-2deg); }
+}
+@keyframes roboBlink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.15); }
+}
+@keyframes antennaWag {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
+}
+@keyframes antennaBlink {
+  0%, 78%, 100% { opacity: 1; }
+  88% { opacity: 0.2; }
+}
+.robo .body.boing { animation: boing 0.6s cubic-bezier(0.3, 1.5, 0.5, 1); }
+
+/* -- robot: the default robo — rounded-square chassis, cyan visor -- */
+.robo.theme-robot .visor .rEye,
+.robo.theme-robot .visor .rMouth { --robo-eye: #7be0ff; }
+
+/* -- alien: taller dome head, wider single-strip visor with big round eyes,
+   two thin bent prongs instead of a straight antenna, no bolts -- */
+.robo.theme-alien .body {
+  border-radius: 44% 44% 28% 28% / 52% 52% 20% 20%;
+  transform: scaleY(1.08);
+  transform-origin: 50% 100%;
+}
+.robo.theme-alien .bolt { display: none; }
+.robo.theme-alien .visor { left: 10%; right: 10%; height: 22%; }
+.robo.theme-alien .visor .rEye { border-radius: 50%; width: 22%; height: 55%; top: 22%; }
+.robo.theme-alien .visor .rEye.l { left: 14%; }
+.robo.theme-alien .visor .rEye.r { right: 14%; }
+.robo.theme-alien .visor .rMouth { display: none; }
+.robo.theme-alien .visor .rEye,
+.robo.theme-alien .visor .rMouth { --robo-eye: #9dffb0; }
+.robo.theme-alien .antenna { display: none; }
+.robo.theme-alien .prong {
+  position: absolute;
+  top: -14%;
+  width: 4%;
+  height: 22%;
+  border-radius: 3px;
+  background: var(--c2);
+  transform-origin: 50% 100%;
+  animation: antennaWag 3.4s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.robo.theme-alien .prong.l { left: 30%; transform: rotate(-18deg); }
+.robo.theme-alien .prong.r { right: 30%; transform: rotate(18deg); }
+.robo.theme-alien .prong::after {
+  content: "";
+  position: absolute;
+  top: -60%; left: 50%;
+  width: 150%; height: 55%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #d6ffe0;
+  box-shadow: 0 0 5px 2px rgba(160, 255, 180, 0.85);
+}
+
+/* -- drone: flat circular chassis, one round camera-lens eye, spinning fins
+   on top instead of an antenna, and a glowing hover ring instead of a
+   grounded shadow -- */
+.robo.theme-drone .body { border-radius: 50%; }
+.robo.theme-drone .body::before { border-radius: 50%; }
+.robo.theme-drone .bolt.l { left: -3%; top: 46%; }
+.robo.theme-drone .bolt.r { right: -3%; top: 46%; }
+.robo.theme-drone .visor {
+  left: 30%; right: 30%; top: 30%; height: 34%;
+  border-radius: 50%;
+}
+.robo.theme-drone .visor .rEye {
+  left: 20%; right: 20%; width: auto; top: 20%; height: 60%;
+  border-radius: 50%;
+}
+.robo.theme-drone .visor .rEye.r { display: none; }
+.robo.theme-drone .visor .rMouth { display: none; }
+.robo.theme-drone .visor .rEye { --robo-eye: #ffd27a; }
+.robo.theme-drone .antenna { display: none; }
+/* the drone's round visor reaches lower than the default rectangular one,
+   so its plate + letter are pushed further down to stay clear of it */
+.robo.theme-drone .plate { top: 68%; height: 22%; }
+.robo.theme-drone .ch { top: 72%; }
+.robo.theme-drone .fin {
+  position: absolute;
+  top: 2%;
+  width: 34%;
+  height: 8%;
+  border-radius: 6px;
+  background: var(--c2);
+  box-shadow: inset 0 -2px 3px var(--deep);
+  transform-origin: 50% 50%;
+  animation: finSpin 2.6s linear infinite;
+}
+.robo.theme-drone .fin.l { left: -6%; }
+.robo.theme-drone .fin.r { right: -6%; animation-delay: -1.3s; }
+@keyframes finSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.robo.theme-drone .foot {
+  bottom: -10%;
+  height: 8%;
+  background: transparent;
+  border-radius: 50%;
+  box-shadow: 0 0 10px 3px #ffd27a;
+  filter: none;
+  opacity: 0.6;
+}
+
+/* ---------- progress + lengths ---------- */
+#progress {
+  padding: 6px 14px 8px 14px;
+}
+#progressText {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 6px;
+}
+#progressTrack {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--well-bg);
+  box-shadow: inset 0 3px 4px rgba(var(--sh), 0.25);
+  overflow: hidden;
+}
+#progressFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(var(--accent-light), var(--strawberry));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.6);
+  transition: width 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+/* Always ONE row, fully visible, never scrolling: the chips share the row
+   equally (flex 1 1 0) and each stacks a small "N letters" caption over its
+   found/total count, so even 6 chips fit a 320px phone. overflow stays
+   visible so the chips' bottom edge is never clipped, and the row has its own
+   breathing room so the secret-word boxes below can never touch it. */
+#lengthChips {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 4px;
+  margin: 0 10px;
+  padding: 0 0 6px 0;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+.chip {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 2px 4px 2px;
+  border-radius: 12px;
+  line-height: 1.15;
+  white-space: nowrap;
+  font-size: clamp(9px, 2.9vw, 13px);
+  font-weight: 600;
+  background: var(--chip, #fff);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 3px 0 var(--chip-edge, rgba(var(--sh), 0.25));
+}
+.chip em { font-style: normal; font-size: 0.86em; font-weight: 500; }
+.chip em b { font-weight: 700; font-size: 1.1em; }
+.chip span { font-weight: 700; font-size: 1.12em; }
+.chip.done { opacity: 0.6; }
+.chip.star { --chip: var(--butter-soft); --chip-edge: var(--butter-edge); }
+.chip.star span { color: #d99a00; }
+
+/* length colors shared by chips and slots */
+.len-4 { --chip: #c3f3e2; --chip-edge: #6fd8b2; }
+.len-5 { --chip: #c6e8ff; --chip-edge: #6fbbf6; }
+.len-6 { --chip: #dcd0ff; --chip-edge: #a58cf3; }
+.len-7 { --chip: #ffdcc4; --chip-edge: #ffa276; }
+.len-8 { --chip: #ffc9e0; --chip-edge: #ff8abf; }
+.len-9, .len-10, .len-11, .len-12 { --chip: #ffc9e0; --chip-edge: #ff8abf; }
+
+/* ---------- secret word slots ---------- */
+#slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  padding: 10px 14px 6px 14px;   /* top room for the corner number badges */
+}
+
+.slot {
+  position: relative;
+  /* shrinks on short screens so the whole board fits without scrolling */
+  min-height: clamp(34px, calc(var(--vh, 1vh) * 5), 46px);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  background: var(--well-bg);                 /* empty: a pressed-in hollow */
+  box-shadow:
+    inset 0 4px 6px rgba(var(--sh), 0.22),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.8);
+}
+
+.slot .badge {
+  position: absolute;
+  top: -7px;
+  left: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--chip);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 2px 0 var(--chip-edge);
+}
+
+.slot .dots {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+}
+.slot .dots i {
+  width: clamp(4px, 1.4vw, 6px);
+  height: clamp(4px, 1.4vw, 6px);
+  border-radius: 50%;
+  background: rgba(var(--sh), 0.28);
+}
+
+.slot .word {
+  display: none;
+  font-size: clamp(11px, 3.5vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.slot.found {
+  background-color: var(--chip);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 55%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.85),
+    0 4px 0 var(--chip-edge),
+    0 8px 12px rgba(var(--sh), 0.2);
+}
+.slot.found .dots { display: none; }
+.slot.found .word { display: block; }
+.slot.found .badge { display: none; }
+
+.slot.pangram::after {
+  content: "\2605";
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  font-size: 16px;
+  line-height: 1;
+  color: #ffc21f;
+  text-shadow: 0 1px 0 #c98a00, 0 0 0 #fff;
+}
+.slot.found.pangram {
+  --chip: #ffe98a;
+  --chip-edge: #e6b526;
+}
+
+.slot.pop { animation: pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes pop {
+  0% { transform: scale(0.5); opacity: 0.2; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- bonus words ---------- */
+#bonusWrap { padding: 8px 14px 10px 14px; }
+#bonusTitle { font-size: 14px; font-weight: 600; }
+#bonusTitle small { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+#bonusCount {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  text-align: center;
+  background: var(--butter);
+  box-shadow: 0 2px 0 var(--butter-edge);
+}
+#bonusList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+#bonusList:empty { display: none; }
+#bonusList span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--butter-soft);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 2px 0 var(--butter-edge);
+}
+
+/* ---------- leaderboard ---------- */
+#leaderboardWrap { padding: 8px 14px 10px 14px; }
+#leaderboardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 6px 0;
+}
+#leaderboardWrap h3 { margin: 0; font-size: 15px; font-weight: 700; }
+#leaderboardWrap h3 small { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+#leaderboardViewToggle { display: inline-flex; gap: 4px; }
+.lbViewBtn {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--font);
+  color: var(--ink-soft);
+  background: rgba(var(--sh), 0.08);
+  cursor: pointer;
+}
+.lbViewBtn.active { background: var(--strawberry); color: #fff; box-shadow: 0 2px 0 var(--strawberry-deep); }
+#leaderboard li.lbEmpty { list-style: none; padding: 4px 0; font-size: 13px; color: var(--ink-soft); }
+
+#diagnostics {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  padding: 8px 14px;
+  margin-bottom: 4px;
+}
+
+/* ---------- controls ---------- */
+#bottomControls {
+  padding: 8px 12px 10px 12px;
+  background: rgba(var(--bar-rgb), 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -6px 16px rgba(var(--sh), 0.16);
+}
+
+.panel { display: none; gap: 6px; flex-wrap: wrap; align-items: center; }
+.panel.visible { display: flex; }
+
+.panel input[type="text"],
+.panel input[type="password"] {
+  flex: 1 1 140px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 0;
+  background: var(--well-bg);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: inset 0 3px 5px rgba(var(--sh), 0.22);
+}
+.panel input[type="text"]::placeholder,
+.panel input[type="password"]::placeholder { color: var(--ink-soft); opacity: 0.85; }
+
+.panel button {
+  padding: 9px 14px;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(var(--accent-light), var(--strawberry));
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.6), 0 4px 0 var(--strawberry-deep), 0 8px 12px rgba(217, 70, 138, 0.28);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.panel button:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.6), 0 1px 0 var(--strawberry-deep);
+}
+
+#hostPanel {
+  display: flex;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px dotted rgba(var(--sh), 0.25);
+}
+.hostTitle { width: 100%; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+
+/* ---------- celebration + toast ---------- */
+#celebration {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 39, 96, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  overflow: hidden;
+}
+#celebration { cursor: pointer; }
+#celebration.hidden { display: none; }
+#celebrationCard {
+  position: relative;
+  width: min(420px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 24px;
+  padding: 18px 18px 16px 18px;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  cursor: default;
+  animation: celebPop 0.32s cubic-bezier(0.2, 1.4, 0.5, 1) both;
+}
+@keyframes celebPop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+#celebrationText {
+  position: relative;
+  font-size: clamp(24px, 7vw, 34px);
+  font-weight: 700;
+  color: var(--butter-deep);
+  text-shadow: 0 3px 0 var(--butter-deeper), 0 8px 14px rgba(0, 0, 0, 0.25);
+  animation: pulse 0.6s ease-in-out infinite alternate;
+  margin-bottom: 8px;
+}
+@keyframes pulse {
+  from { transform: scale(1) rotate(-1.5deg); }
+  to { transform: scale(1.08) rotate(1.5deg); }
+}
+#celebrationBoards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0 12px 0;
+}
+.celebLbSection {
+  background: var(--surface2);
+  border-radius: 16px;
+  padding: 8px 12px 10px 12px;
+  text-align: left;
+}
+.celebLbSection h4 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+}
+.celebLbSection ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 168px;
+  overflow-y: auto;
+}
+.celebLbSection li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(var(--sh), 0.08);
+}
+.celebLbSection li:last-child { border-bottom: 0; }
+.celebLbSection li.lbEmpty { list-style: none; padding: 8px 0; font-size: 13px; color: var(--ink-soft); border-bottom: 0; }
+.celebLbSection li .rank { min-width: 1.5em; font-weight: 700; color: var(--strawberry-deep); text-align: right; }
+.celebLbSection li .lbName { font-weight: 600; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.celebLbSection li .lbPts { font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.celebLbSection li:first-child .lbName { font-weight: 800; }
+#celebrationCountdown {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--butter-soft);
+  border-radius: 999px;
+  padding: 7px 14px;
+  display: inline-block;
+}
+#celebrationCountdown.waiting { background: var(--surface2); }
+
+#confetti { position: absolute; inset: 0; pointer-events: none; }
+#confetti i {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 14px;
+  border-radius: 3px;
+  animation: fall linear forwards;
+}
+@keyframes fall {
+  to { transform: translateY(110vh) rotate(540deg); }
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 58px);
+  transform: translateX(-50%);
+  max-width: 90vw;
+  text-align: center;
+  background: var(--cream);
+  color: var(--ink);
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 1000;
+  box-shadow: inset 0 2px 0 #fff, 0 4px 0 var(--strawberry), 0 10px 18px rgba(var(--sh), 0.3);
+}
+#toast.hidden { display: none; }
+
+/* ---------- compact / stream mode ---------- */
+html.compact #rulesLegend,
+html.compact #diagnostics { display: none; }
+html.compact #app { gap: 6px; }
+
+/* ---------- board animation toggle ---------- */
+html.no-board-anim .mochi,
+html.no-board-anim .mochi .eye,
+html.no-board-anim .mochi .ear,
+html.no-board-anim .mochi .body.boing { animation: none !important; }
+html.no-board-anim .robo,
+html.no-board-anim .robo .visor .rEye,
+html.no-board-anim .robo .antenna,
+html.no-board-anim .robo .antenna::after,
+html.no-board-anim .robo .prong,
+html.no-board-anim .robo .fin,
+html.no-board-anim .robo .body.boing { animation: none !important; }
+
+/* =======================================================================
+   AVATARS — circular viewer profile pictures (real TikTok avatar when
+   known, otherwise a deterministic colorful initials avatar). Used in the
+   live feed, next to newly-found secret words, on bonus word chips, and
+   in the leaderboard.
+   ======================================================================= */
+.avatar {
+  --a-size: 26px;
+  width: var(--a-size);
+  height: var(--a-size);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--a-size) * 0.42);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px #fff, 0 2px 5px rgba(var(--sh), 0.35);
+  overflow: hidden;
+  user-select: none;
+}
+.avatar.size-small { --a-size: 18px; }
+.avatar.size-medium { --a-size: 26px; }
+.avatar.size-large { --a-size: 38px; }
+html.hide-avatars .avatar { display: none; }
+
+/* small avatar badge that sits on the corner of a freshly-found slot */
+.slot-avatar {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  z-index: 2;
+}
+.slot-avatar .avatar { --a-size: 20px; }
+
+/* ---------- bonus words as avatar + word chips ---------- */
+#bonusList span.bonusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--butter-soft);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.8), 0 2px 0 var(--butter-edge);
+}
+
+/* ---------- leaderboard rows with avatar ---------- */
+#leaderboard { list-style: none; padding-left: 0; margin: 0; }
+#leaderboard li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+#leaderboard li .rank {
+  min-width: 1.4em;
+  font-weight: 700;
+  color: var(--strawberry-deep);
+  text-align: right;
+}
+#leaderboard li .lbName { font-weight: 600; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#leaderboard li .lbPts { font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+#leaderboard li:first-child .lbName { font-weight: 800; }
+
+/* =======================================================================
+   LIVE GUESS FEED — the panel reserves a fixed-height slot in normal page
+   flow, between the instructions and the letters, so nothing above or
+   below it ever moves. But the panel itself stays fully invisible
+   (no background, no shadow) when idle — only the guess "chip" floats up
+   into view, hovers for a moment, then floats back out. Exactly ONE guess
+   is shown at a time. Toggle from Settings.
+   ======================================================================= */
+html.hide-feed #liveFeedPanel,
+html.hide-controls #liveFeedPanel { display: none; }
+
+/* exactly one row lives here at a time */
+#liveFeedList {
+  padding: 0 8px;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+#liveFeedPanel.has-item #liveFeedList { padding: 7px 8px; }
+.feedRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  width: 100%;
+  border-radius: 12px;
+  background: rgba(var(--sh), 0.06);
+  font-size: 13px;
+  animation: feedIn 0.32s cubic-bezier(0.25, 1.6, 0.4, 1);
+}
+.feedRow.feedOut { animation: feedOut 0.35s ease-in forwards; }
+.feedRow.bonus { background: var(--butter-soft); }
+.feedRow .feedUser { font-weight: 700; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34%; }
+.feedRow .feedWord { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: 0.02em; }
+.feedRow .feedPts { flex: 0 0 auto; font-weight: 700; color: var(--strawberry-deep); }
+/* Floats up out of the empty slot, hovers, then floats back down and out —
+   rather than simply fading in place. */
+@keyframes feedIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.85); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes feedOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-14px) scale(0.88); }
+}
+
+/* host panel: new controls need to wrap nicely with everything else */
+#hostGotoRound { flex: 0 1 90px; }
+#hostPause.active { background: linear-gradient(var(--accent-light), var(--strawberry)); box-shadow: inset 0 2px 0 rgba(255,255,255,0.6), 0 4px 0 var(--strawberry-deep); }
+#hostAutoNext.active { background: linear-gradient(#b6f2d8, #7fe0b3); box-shadow: inset 0 2px 0 rgba(255,255,255,0.6), 0 4px 0 #3fa87c; }
+#testAutoBotBtn.active { background: linear-gradient(#b6f2d8, #7fe0b3); box-shadow: inset 0 2px 0 rgba(255,255,255,0.6), 0 4px 0 #3fa87c; }
+#hostResetRound, #hostReset { background: var(--danger-soft); }
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(var(--sh), 0.1);
+  font-size: 14px;
+  font-weight: 500;
+}
+.settingRow:last-child { border-bottom: 0; }
+.settingRow select,
+.settingRow input[type="number"] {
+  font-family: var(--font);
+  padding: 5px 8px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--well-bg);
+  color: var(--ink);
+  font-weight: 600;
+  width: 110px;
+}
+.settingRow input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--strawberry); }
+.settingRow input[type="range"] { width: 120px; accent-color: var(--strawberry); }
+/* ---------- Live tab: username row + Euler Stream API key row ---------- */
+#livePanel.visible { flex-direction: column; align-items: stretch; gap: 6px; }
+.liveRow { display: flex; gap: 6px; align-items: center; width: 100%; }
+.liveRow input { min-width: 0; }
+#liveKeyStatus {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  padding: 0 4px;
+}
+#liveKeyStatus a { color: var(--ink); font-weight: 700; text-decoration: underline; }
+
+
+/* =======================================================================
+   FLOATING LIVE GUESS FEED (v2.4) — overrides the earlier feed block.
+   The PANEL owns a fixed-height slot in normal page flow, directly below
+   the instructions and above the letters, and stays completely invisible
+   (no background, no shadow, never painted) at all times — it exists only
+   to reserve that space so nothing above or below it ever shifts or gets
+   covered by another section. It never itself "sits there" as a visible
+   box.
+   The guess itself is a separate floating chip (.feedRow) that pops up
+   out of that empty slot, hovers for a moment, then floats back down and
+   out. Only one chip floats at a time.
+   ======================================================================= */
+html { --feed-h: 46px; }
+html[data-avatar="small"] { --feed-h: 38px; }
+html[data-avatar="large"] { --feed-h: 58px; }
+
+#liveFeedPanel {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--feed-h);
+  min-height: var(--feed-h);
+  max-height: var(--feed-h);
+  margin: 0 12px;
+  max-width: none;
+  padding: 0 6px;
+  overflow: visible;       /* lets the floating chip lift slightly clear of its slot */
+  background: transparent; /* the slot itself is never painted, empty or not */
+  box-shadow: none;
+  pointer-events: none;
+  z-index: 5;
+}
+html.hide-feed #liveFeedPanel { display: none; }
+html.hide-controls #liveFeedPanel { display: flex; }     /* keep it visible in clean stream view */
+html.hide-controls.hide-feed #liveFeedPanel { display: none; }
+
+#liveFeedList {
+  width: 100%;
+  min-height: 0;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feedRow {
+  width: auto;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 6px 14px 6px 8px;
+  gap: 9px;
+  background: var(--cream);
+  border-radius: 999px;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 8px 18px rgba(var(--sh), 0.22);
+  font-size: 14px;
+  pointer-events: auto;
+}
+.feedRow.bonus { background: var(--butter-soft); }
+.feedRow .avatar { box-shadow: 0 0 0 2px #fff, 0 2px 5px rgba(var(--sh), 0.35); }
+.feedRow .feedUser { max-width: 32%; color: var(--ink-soft); }
+.feedRow .feedWord { flex: 1 1 auto; text-align: center; font-size: 1.15em; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.feedRow .feedPts { font-size: 1.05em; }
+
+/* ---------- leaderboard modal ---------- */
+#lbOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 39, 96, 0.55);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#lbOverlay.hidden { display: none; }
+#lbModal {
+  width: min(460px, 100%);
+  max-height: 88vh;
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 22px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#lbModalHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 2px dotted rgba(var(--sh), 0.2);
+}
+#lbModalHeader h2 { margin: 0; font-size: 18px; }
+#lbModalHeader h2 small { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; margin-left: 4px; }
+#lbCloseBtn {
+  border: 0;
+  background: var(--surface2);
+  color: var(--ink);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 0 2px 0 #fff, 0 3px 0 rgba(var(--sh), 0.25);
+}
+#lbModalToggle { flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 18px 4px 18px; }
+#lbModalToggle .lbViewBtn { flex: 1 1 0; padding: 7px 10px; font-size: 13px; }
+#lbModalList {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px 18px 10px 18px;
+}
+#lbModalList li { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 15px; border-bottom: 1px solid rgba(var(--sh), 0.08); }
+#lbModalList li.lbEmpty { list-style: none; padding: 14px 0; text-align: center; font-size: 14px; color: var(--ink-soft); border-bottom: 0; }
+#lbModalList li .rank { min-width: 1.6em; font-weight: 700; color: var(--strawberry-deep); text-align: right; }
+#lbModalList li .lbName { font-weight: 600; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#lbModalList li .lbPts { font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+#lbModalList li:first-child .lbName { font-weight: 800; }
+#lbModalActions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 18px 16px 18px;
+  border-top: 2px dotted rgba(var(--sh), 0.2);
+}
+#lbModalActions button {
+  flex: 1 1 auto;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(var(--accent-light), var(--strawberry));
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.6), 0 3px 0 var(--strawberry-deep);
+}
+#lbModalActions button:active { transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.6), 0 1px 0 var(--strawberry-deep); }
+#lbResetRoundBtn, #lbResetAllBtn { background: var(--danger-soft) !important; }
+
+
+/* ===== platform layout glue ===== */
+html.hide-controls .heroBand, html.hide-controls .topbar, html.hide-controls #bottomControls, html.hide-controls #diagnostics { display: none; }
+html.hide-controls #showControlsBtn { display: block; }
+html.hide-controls #toast { top: calc(env(safe-area-inset-top, 0px) + 16px); }
+#showControlsBtn { display: none; position: fixed; right: calc(env(safe-area-inset-right, 0px) + 12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--cream); color: var(--ink); font-size: 22px; line-height: 1; cursor: pointer; opacity: .45; z-index: 60; box-shadow: inset 0 2px 0 #fff, 0 3px 0 rgba(var(--sh), .3), 0 8px 14px rgba(var(--sh), .25); }
+.app > .stage { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; width: 100%; max-width: 560px; margin: 0 auto; padding: 4px 0 8px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; -webkit-overflow-scrolling: touch; }
+#colLeft, #colRight { display: contents; }
+#bottomControls { position: static; flex: 0 0 auto; max-height: 38vh; overflow-y: auto; margin-top: 0; width: 100%; box-sizing: border-box; }
+.modeBadge { cursor: pointer; border: 0; font-family: inherit; }
+.pickerOption.modeBtn.active .pickerRadio { border-color: var(--gold); }
+.pickerOption.modeBtn.active .pickerRadio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--gold); }
+.settingRow { color: var(--theme-ink); }
+.theme-picker { display: flex; align-items: center; gap: 8px; }
+.settingsSavedRow { text-align: right; font-size: 12px; color: var(--ink-soft); min-height: 1.4em; }
+#toast { z-index: 1500; }
+#lbOverlay { z-index: 1300; }
+@media (orientation: landscape) and (min-width: 720px) {
+  .app > .stage { max-width: 1500px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 18px; row-gap: 10px; padding: 4px 16px 8px; align-content: start; }
+  #colLeft, #colRight { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  #colLeft { justify-content: center; }
+  #flower { --flower: min(34vw, calc(var(--vh, 1vh) * 44), 520px); }
+  #slots { grid-template-columns: repeat(5, 1fr); }
+  .slot { min-height: clamp(42px, calc(var(--vh, 1vh) * 6), 60px); }
+  .slot .word { font-size: clamp(13px, 1.2vw, 20px); }
+  #leaderboard { columns: 2; column-gap: 24px; }
+  #leaderboard li { break-inside: avoid; }
+  #bottomControls { max-width: 1500px; margin: 0 auto; }
+  .panel { flex-wrap: nowrap; }
+  #hostPanel { flex-wrap: wrap; }
+}
+@media (orientation: landscape) and (max-height: 520px) { #bottomControls { max-height: 30vh; } .heroBand { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mochi, .mochi .eye { animation: none; } .mochi .ear { animation: none !important; }
+  .mochi .body.boing, .slot.pop, #celebrationText { animation: none; }
+  .robo, .robo .visor .rEye, .robo .antenna, .robo .antenna::after, .robo .prong, .robo .fin { animation: none !important; }
+  .robo .body.boing { animation: none; } #progressFill { transition: none; }
+}
+.app > .stage > *, #colLeft > *, #colRight > * { flex-shrink: 0; }
+#hostPanel .hostTitle { display: none; }
+#hostResetRound, #hostReset, #hostExport { display: none; }   /* the same three actions live in the leaderboard window */
+#hostPanel { gap: 5px; margin-top: 6px; padding-top: 6px; }
+#hostPanel button, #testPanel button, #offlinePanel button { padding: 7px 11px; font-size: 12.5px; }
+#hostPanel input[type="number"] { width: 78px; padding: 7px 8px; border-radius: 14px; border: 0; background: var(--well-bg); color: var(--ink); font-size: 13px; box-shadow: inset 0 3px 5px rgba(var(--sh), .22); }
+#bottomControls { padding: 6px 12px 8px; }
+body[data-game="blossom"] .heroTagline { display: none; }
+#bottomControls { max-height: 32vh; }
+#rulesLegend { -webkit-line-clamp: 3; }

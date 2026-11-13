@@ -1,0 +1,1255 @@
+// game.js — everything the browser page does.
+// Sections: viewport fix, socket, avatars, mochi board, secret-word slots,
+// length chips, bonus words, leaderboard, live feed, leaderboard modal, diagnostics, toast +
+// celebration, sound effects, settings panel, modes, fullscreen + hide
+// controls, offline/test/host controls, and the socket event wiring at the
+// bottom.
+
+// viewport — fixes mobile browsers reporting the wrong 100vh
+function setViewportHeight() {
+  document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+}
+setViewportHeight();
+window.addEventListener('resize', setViewportHeight);
+window.addEventListener('orientationchange', setViewportHeight);
+document.addEventListener('fullscreenchange', function () { setTimeout(setViewportHeight, 50); });
+document.addEventListener('webkitfullscreenchange', function () { setTimeout(setViewportHeight, 50); });
+
+let reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// socket — connects to the server
+const socket = io('/blossom');
+const API = '/blossom/api';
+
+// current settings, filled in as soon as the server sends state. Sensible
+// defaults here just avoid a flash of the wrong UI before the first 'state'.
+let settings = {
+  theme: 'candy', boardTheme: 'mochi', showAvatars: true, avatarSize: 'medium', boardAnimationEnabled: true,
+  confettiEnabled: true, compactMode: false, showDiagnostics: true, showRecentFeed: true,
+  recentFeedSize: 12, feedItemDurationMs: 4000, leaderboardSize: 10, bonusWordsEnabled: true, pointsMultiplier: 1,
+  minGuessLength: 4, hintCooldownMs: 8000, hintDurationMs: 5000, skipCooldownMs: 600,
+  autoAdvanceLive: true, autoAdvanceOffline: true, autoAdvanceEnabled: true,
+  autoAdvanceDelayMs: 5000, autoBotEnabled: false,
+  paused: false, soundEnabled: true, soundVolume: 0.5
+};
+
+// ---------------- THEMES ----------------
+// Single source of truth for every theme: id (matches data-theme in CSS and
+// the server's allow-list), a short symbol shown on the toolbar button and
+// next to the name in the dropdown, and the full name shown only once the
+// dropdown is open (or in the Settings panel's select).
+const THEMES = [
+  { id: 'candy',    name: 'Candy Pink',      icon: '\u{1F36C}', bar: '#ffdcee' }, // 🍬
+  { id: 'mint',     name: 'Minty Fresh',     icon: '\u{1F343}', bar: '#d6fff0' }, // 🍃
+  { id: 'sunset',   name: 'Sunset',          icon: '\u{1F305}', bar: '#ffe3cf' }, // 🌅
+  { id: 'ocean',    name: 'Ocean Breeze',    icon: '\u{1F30A}', bar: '#d6f0ff' }, // 🌊
+  { id: 'sky',      name: 'Sky Blue',        icon: '\u{1F324}\uFE0F', bar: '#eaf7ff' }, // 🌤️
+  { id: 'meadow',   name: 'Meadow Green',    icon: '\u{1F340}', bar: '#e6ffe0' }, // 🍀
+  { id: 'blossom',  name: 'Blossom Pink',    icon: '\u{1F338}', bar: '#fff0f7' }, // 🌸
+  { id: 'lavender', name: 'Lavender Violet', icon: '\u{1F49C}', bar: '#ede2ff' }, // 💜
+  { id: 'honey',    name: 'Honey Gold',      icon: '\u{1F36F}', bar: '#fff3d6' }, // 🍯
+  { id: 'cream',    name: 'Cream',           icon: '\u{1F366}', bar: '#fff8e8' }, // 🍦
+  { id: 'light',    name: 'Light',           icon: '\u2600\uFE0F', bar: '#ffffff' }, // ☀️
+  { id: 'dark',     name: 'Dark',            icon: '\u26AB', bar: '#121116' },    // ⚫
+  { id: 'midnight', name: 'Midnight',        icon: '\u{1F30C}', bar: '#1c1530' }  // 🌌
+];
+const THEME_BY_ID = {};
+THEMES.forEach(function (t) { THEME_BY_ID[t.id] = t; });
+
+// The board mascot's species, in two families:
+//  - "mochi" family: the original squishy round blob plus 7 palette/
+//    silhouette variants. Purely a shape/decoration swap in CSS; every one
+//    keeps mochi's bob/blink/boing animations and pastel palette.
+//  - "robo" family: a completely different mascot design — blocky/disc
+//    chassis, a dark glowing visor for a face, an antenna or spinning fins
+//    instead of ears, and its own float/blink motion. It never reuses
+//    mochi's markup, shape, or animations (see style.css).
+const BOARD_THEMES = [
+  { id: 'mochi', name: 'Mochi',       icon: '\u{1F361}', family: 'mochi' }, // 🍡
+  { id: 'bear',  name: 'Bear Cubs',   icon: '\u{1F43B}', family: 'mochi' }, // 🐻
+  { id: 'cat',   name: 'Kittens',     icon: '\u{1F431}', family: 'mochi' }, // 🐱
+  { id: 'bunny', name: 'Bunnies',     icon: '\u{1F430}', family: 'mochi' }, // 🐰
+  { id: 'panda', name: 'Pandas',      icon: '\u{1F43C}', family: 'mochi' }, // 🐼
+  { id: 'chick', name: 'Chicks',      icon: '\u{1F424}', family: 'mochi' }, // 🐤
+  { id: 'cloud', name: 'Clouds',      icon: '\u2601\uFE0F', family: 'mochi' }, // ☁️
+  { id: 'star',  name: 'Stars',       icon: '\u2B50', family: 'mochi' }, // ⭐
+  { id: 'robot', name: 'Robots',      icon: '\u{1F916}', family: 'robo' }, // 🤖
+  { id: 'alien', name: 'Aliens',      icon: '\u{1F47D}', family: 'robo' }, // 👽
+  { id: 'drone', name: 'Drones',      icon: '\u{1F6F8}', family: 'robo' }  // 🛸
+];
+const BOARD_THEME_BY_ID = {};
+BOARD_THEMES.forEach(function (t) { BOARD_THEME_BY_ID[t.id] = t; });
+
+// ---------------- AVATARS ----------------
+// Real TikTok avatars are used automatically whenever the server has one for
+// a viewer. Everyone else (offline/test/host, or a viewer TikTok gave no
+// picture for) gets a deterministic colorful initials avatar instead, so the
+// UI never shows a broken image.
+const AVATAR_PALETTE = ['#ff6fae', '#ffb15e', '#8ee6c8', '#8ed2ff', '#c9b6ff', '#ff9ec6', '#5eceb0', '#f0a8ff'];
+function hashUser(name) {
+  let h = 0;
+  const s = String(name || '?');
+  for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+  return h;
+}
+function initialsFor(name) {
+  const s = String(name || '?').trim();
+  if (!s) return '?';
+  const parts = s.replace(/[^a-zA-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+  if (!parts.length) return s[0].toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+function avatarSizeClass() {
+  return 'size-' + (settings.avatarSize || 'medium');
+}
+// Returns a DOM element: a real <img> when a URL is known, otherwise a
+// colored circle with initials. Always circular via the shared .avatar class.
+function makeAvatar(user, url) {
+  const sizeClass = avatarSizeClass();
+  if (url) {
+    const img = document.createElement('img');
+    img.className = 'avatar ' + sizeClass;
+    img.src = url;
+    img.alt = user || '';
+    img.referrerPolicy = 'no-referrer';
+    img.loading = 'lazy';
+    img.onerror = function () {
+      const fallback = makeAvatar(user, null);
+      if (img.parentNode) img.parentNode.replaceChild(fallback, img);
+    };
+    return img;
+  }
+  const div = document.createElement('div');
+  div.className = 'avatar ' + sizeClass;
+  div.style.background = AVATAR_PALETTE[hashUser(user) % AVATAR_PALETTE.length];
+  div.textContent = initialsFor(user);
+  div.title = user || '';
+  return div;
+}
+
+// ---------------- MOCHI BOARD (7 letters: 1 center + 6 friends) ----------------
+const MOCHI_COLORS = ['mint', 'lavender', 'peach', 'sky', 'butter', 'bubble'];
+let boardKey = '';
+
+// Extra decoration markup for the species that need it, inserted inside
+// .body BEFORE the eyes/cheeks/mouth/letter (so those still paint on top).
+// "cloud" and "star" need no extra elements — their look comes entirely
+// from CSS on .body itself (see style.css).
+function critterExtras(theme) {
+  if (theme === 'bear') {
+    return '<i class="ear l"></i><i class="ear r"></i>';
+  }
+  if (theme === 'cat') {
+    return '<i class="ear l"></i><i class="ear r"></i>' +
+      '<i class="whisker l"></i><i class="whisker r"></i>' +
+      '<i class="nose"></i>';
+  }
+  if (theme === 'bunny') {
+    return '<i class="ear l"></i><i class="ear r"></i>';
+  }
+  if (theme === 'panda') {
+    return '<i class="ear l"></i><i class="ear r"></i>' +
+      '<i class="patch l"></i><i class="patch r"></i>';
+  }
+  if (theme === 'chick') {
+    return '<i class="tuft"></i><i class="beak"></i>';
+  }
+  if (theme === 'cloud') {
+    return '<i class="puff l"></i><i class="puff r"></i>';
+  }
+  return '';
+}
+
+// Builds one mochi-family friend: round blob body, eyes/cheeks/mouth drawn
+// directly on the body, letter centered over the face.
+function makeMochi(letter, colorClass, delay, theme) {
+  const t = theme || 'mochi';
+  const el = document.createElement('div');
+  el.className = 'mochi theme-' + t + ' ' + colorClass;
+  el.style.setProperty('--d', delay + 's');
+  el.innerHTML =
+    '<span class="ground"></span>' +
+    '<div class="body">' +
+      critterExtras(t) +
+      '<i class="eye l"></i><i class="eye r"></i>' +
+      '<i class="cheek l"></i><i class="cheek r"></i>' +
+      '<i class="mouth"></i>' +
+      '<b class="ch"></b>' +
+    '</div>';
+  el.querySelector('.ch').textContent = letter;
+  return el;
+}
+
+// Extra headgear markup per robo species, inserted inside .body ABOVE the
+// visor. Robot gets a single antenna; alien swaps it for two bent prongs;
+// drone drops it for a pair of spinning top fins. None of this ever touches
+// the visor, eyes, or the letter's chest plate below.
+function roboExtras(theme) {
+  if (theme === 'alien') {
+    return '<i class="prong l"></i><i class="prong r"></i>';
+  }
+  if (theme === 'drone') {
+    return '<i class="fin l"></i><i class="fin r"></i>';
+  }
+  return '<i class="antenna"></i>'; // robot (default robo look)
+}
+
+// Builds one robo-family friend: blocky/disc chassis, a dark glowing visor
+// for the face (never overlapping the letter), and its own headgear. This
+// is a completely separate shape/markup from makeMochi — see style.css.
+function makeRobo(letter, colorClass, delay, theme) {
+  const t = theme || 'robot';
+  const el = document.createElement('div');
+  el.className = 'robo theme-' + t + ' ' + colorClass;
+  el.style.setProperty('--d', delay + 's');
+  el.innerHTML =
+    '<span class="foot"></span>' +
+    '<div class="body">' +
+      roboExtras(t) +
+      '<i class="bolt l"></i><i class="bolt r"></i>' +
+      '<div class="visor">' +
+        '<i class="rEye l"></i><i class="rEye r"></i>' +
+        '<i class="rMouth"></i>' +
+      '</div>' +
+      '<div class="plate"></div>' +
+      '<b class="ch"></b>' +
+    '</div>';
+  el.querySelector('.ch').textContent = letter;
+  return el;
+}
+
+// Picks the right builder for whichever species is currently selected, so
+// the rest of the board code doesn't need to know the two families apart.
+function makeBoardFriend(letter, colorClass, delay, theme) {
+  const t = theme || 'mochi';
+  const def = BOARD_THEME_BY_ID[t];
+  if (def && def.family === 'robo') return makeRobo(letter, colorClass, delay, t);
+  return makeMochi(letter, colorClass, delay, t);
+}
+
+function renderBoard(letters, center) {
+  const theme = settings.boardTheme || 'mochi';
+  const key = letters.join('') + center + '|' + theme;
+  if (key === boardKey) return;   // same letters + same theme: keep the animations running
+  boardKey = key;
+
+  const flowerEl = document.getElementById('flower');
+  flowerEl.innerHTML = '';
+
+  const friends = letters.filter(function (l) { return l !== center; });
+  const ring = 33;      // distance from the middle, in % of the board
+  const size = 28;      // size of each friend, in % of the board
+
+  friends.forEach(function (letter, i) {
+    const angle = (Math.PI * 2 * i) / friends.length - Math.PI / 2;
+    const x = 50 + ring * Math.cos(angle);
+    const y = 50 + ring * Math.sin(angle);
+    const el = makeBoardFriend(letter, MOCHI_COLORS[i % MOCHI_COLORS.length], (i * 0.45).toFixed(2), theme);
+    el.style.width = size + '%';
+    el.style.height = size + '%';
+    el.style.left = (x - size / 2) + '%';
+    el.style.top = (y - size / 2) + '%';
+    flowerEl.appendChild(el);
+  });
+
+  const mid = makeBoardFriend(center, 'center', 0.2, theme);
+  mid.style.width = '34%';
+  mid.style.height = '34%';
+  mid.style.left = '33%';
+  mid.style.top = '33%';
+  const bow = document.createElement('div');
+  bow.className = 'bow';
+  bow.innerHTML = '<i></i><i></i><b></b>';
+  mid.appendChild(bow);
+  flowerEl.appendChild(mid);
+}
+
+// every mochi does a happy squish when a word is found
+function boingBoard() {
+  if (reduceMotion || !settings.boardAnimationEnabled) return;
+  const bodies = document.querySelectorAll('#flower .body');
+  bodies.forEach(function (b, i) {
+    b.classList.remove('boing');
+    void b.offsetWidth; // restart the animation
+    b.style.animationDelay = (i * 0.04) + 's';
+    b.classList.add('boing');
+  });
+}
+
+// ---------------- RULES + PROGRESS ----------------
+function renderRules(s) {
+  document.getElementById('centerCallout').textContent = s.center;
+  document.getElementById('slotsTotalText').textContent = s.slotsTotal;
+  document.getElementById('slotsTotalText2').textContent = s.slotsTotal;
+  document.getElementById('lenRange').textContent = s.minLen === s.maxLen ? String(s.minLen) : (s.minLen + ' to ' + s.maxLen);
+  document.getElementById('foundCount').textContent = s.foundCount;
+  document.getElementById('progressFill').style.width = (s.slotsTotal ? (100 * s.foundCount / s.slotsTotal) : 0) + '%';
+}
+
+// ---------------- LENGTH CHIPS: "how long are the secret words?" ----------------
+function renderLengthChips(s) {
+  // One row, never scrolls: every chip shares the row equally and stacks a
+  // tiny "N letters" caption above its found/total count.
+  const el = document.getElementById('lengthChips');
+  el.innerHTML = '';
+  s.lengthSummary.forEach(function (row) {
+    let found = 0;
+    s.slots.forEach(function (sl) { if (sl.len === row.len && sl.word) found++; });
+    const chip = document.createElement('span');
+    chip.className = 'chip len-' + row.len + (found === row.count ? ' done' : '');
+    chip.title = row.len + '-letter secret words: ' + found + ' of ' + row.count + ' found';
+    chip.innerHTML = '<em><b>' + row.len + '</b> letters</em><span>' + found + '/' + row.count + '</span>';
+    el.appendChild(chip);
+  });
+  if (s.slots.some(function (sl) { return sl.pangram; })) {
+    const star = document.createElement('span');
+    star.className = 'chip star';
+    star.title = 'A secret word that uses all 7 letters';
+    star.innerHTML = '<em>all 7</em><span>\u2605</span>';
+    el.appendChild(star);
+  }
+}
+
+// ---------------- SECRET WORD SLOTS ----------------
+// Each slot is one secret word. Until it is found it only shows how many
+// letters it has (a badge number + one dot per letter). Once found, a small
+// circular avatar of whoever found it sits on the slot's corner.
+function renderSlots(slots) {
+  const slotsEl = document.getElementById('slots');
+
+  if (slotsEl.children.length !== slots.length) {
+    slotsEl.innerHTML = '';
+    slots.forEach(function () {
+      const s = document.createElement('div');
+      s.className = 'slot';
+      s.innerHTML = '<span class="badge"></span><span class="dots"></span><span class="word"></span><span class="slot-avatar"></span>';
+      slotsEl.appendChild(s);
+    });
+  }
+
+  slots.forEach(function (slot, i) {
+    const el = slotsEl.children[i];
+    const found = slot.word || '';
+    const prevFound = el.dataset.word || '';
+    const prevLen = el.dataset.len || '';
+
+    if (String(slot.len) !== prevLen) {
+      el.dataset.len = String(slot.len);
+      el.querySelector('.badge').textContent = slot.len;
+      const dots = el.querySelector('.dots');
+      dots.innerHTML = '';
+      for (let d = 0; d < slot.len; d++) dots.appendChild(document.createElement('i'));
+      el.setAttribute('aria-label', slot.len + ' letter secret word');
+    }
+
+    el.className = 'slot len-' + slot.len + (slot.pangram ? ' pangram' : '') + (found ? ' found' : '');
+    el.querySelector('.word').textContent = found;
+
+    const avatarSlot = el.querySelector('.slot-avatar');
+    if (found && settings.showAvatars) {
+      avatarSlot.innerHTML = '';
+      avatarSlot.appendChild(makeAvatar(slot.by, slot.avatar));
+    } else {
+      avatarSlot.innerHTML = '';
+    }
+
+    if (found && found !== prevFound && !reduceMotion) {
+      el.classList.add('pop');
+    }
+    el.dataset.word = found;
+  });
+}
+
+// ---------------- BONUS WORDS ----------------
+function renderBonus(count, recent) {
+  document.getElementById('bonusCount').textContent = count;
+  const list = document.getElementById('bonusList');
+  list.innerHTML = '';
+  recent.forEach(function (b) {
+    const chip = document.createElement('span');
+    chip.className = 'bonusChip';
+    chip.title = b.by;
+    if (settings.showAvatars) chip.appendChild(makeAvatar(b.by, b.avatar));
+    const text = document.createElement('span');
+    text.textContent = b.word;
+    chip.appendChild(text);
+    list.appendChild(chip);
+  });
+}
+
+// ---------------- LEADERBOARD (This Round vs All-Time) ----------------
+let leaderboardView = 'round';   // 'round' | 'allTime'
+let lastRoundLeaderboard = [];
+let lastAllTimeLeaderboard = [];
+
+function currentLeaderboardEntries() {
+  return leaderboardView === 'allTime' ? lastAllTimeLeaderboard : lastRoundLeaderboard;
+}
+
+function fillLeaderboardList(el, entries) {
+  el.innerHTML = '';
+  if (!entries.length) {
+    const empty = document.createElement('li');
+    empty.className = 'lbEmpty';
+    empty.textContent = leaderboardView === 'allTime' ? 'No points yet' : 'No points yet this round';
+    el.appendChild(empty);
+    return;
+  }
+  entries.forEach(function (row, i) {
+    const li = document.createElement('li');
+    const rank = document.createElement('span');
+    rank.className = 'rank';
+    rank.textContent = (i + 1) + '.';
+    li.appendChild(rank);
+    if (settings.showAvatars) li.appendChild(makeAvatar(row.user, row.avatar));
+    const name = document.createElement('span');
+    name.className = 'lbName';
+    name.textContent = row.user;
+    li.appendChild(name);
+    const pts = document.createElement('span');
+    pts.className = 'lbPts';
+    pts.textContent = row.points + ' pts';
+    li.appendChild(pts);
+    el.appendChild(li);
+  });
+}
+
+function renderLeaderboard(entries) {
+  const viewName = leaderboardView === 'allTime' ? 'All-Time' : 'This Round';
+  document.getElementById('leaderboardSizeLabel').textContent = settings.leaderboardSize;
+  document.getElementById('leaderboardViewLabel').textContent = viewName;
+  document.getElementById('lbModalViewLabel').textContent = viewName;
+  document.querySelectorAll('.lbViewBtn').forEach(function (btn) {
+    btn.classList.toggle('active', btn.dataset.view === leaderboardView);
+  });
+  fillLeaderboardList(document.getElementById('leaderboard'), entries);
+  fillLeaderboardList(document.getElementById('lbModalList'), entries);
+}
+
+// ---------------- LIVE GUESS FEED (docked, one at a time) ----------------
+// Only ever one guess is shown, in the docked panel between the instructions
+// and the letters. New guesses queue up (oldest dropped first if the queue
+// grows past the "max queued" setting) and each one fades out after
+// "feedItemDurationMs" before the next fades in.
+let feedQueue = [];
+let feedShowing = false;
+let feedHideTimer = null;
+
+function queueFeedItem(row) {
+  if (!settings.showRecentFeed) return;
+  feedQueue.push(row);
+  const cap = Math.max(1, settings.recentFeedSize || 12);
+  while (feedQueue.length > cap) feedQueue.shift();
+  processFeedQueue();
+}
+
+function renderFeedRow(row) {
+  const panel = document.getElementById('liveFeedPanel');
+  const list = document.getElementById('liveFeedList');
+  list.innerHTML = '';                 // guarantees only ONE guess exists at a time
+  panel.classList.add('has-item');
+  const item = document.createElement('div');
+  item.className = 'feedRow' + (row.secret ? '' : ' bonus');
+  if (settings.showAvatars) item.appendChild(makeAvatar(row.user, row.avatar));
+  const user = document.createElement('span');
+  user.className = 'feedUser';
+  user.textContent = row.user;
+  item.appendChild(user);
+  const word = document.createElement('span');
+  word.className = 'feedWord';
+  word.textContent = row.word;
+  item.appendChild(word);
+  const pts = document.createElement('span');
+  pts.className = 'feedPts';
+  pts.textContent = '+' + row.points + (row.points === 1 ? ' pt' : ' pts');
+  item.appendChild(pts);
+  list.appendChild(item);
+  return item;
+}
+
+function processFeedQueue() {
+  if (feedShowing || !feedQueue.length || !settings.showRecentFeed) return;
+  feedShowing = true;
+  const row = feedQueue.shift();
+  const el = renderFeedRow(row);
+  const duration = Math.max(1000, settings.feedItemDurationMs || 4000);
+  if (feedHideTimer) clearTimeout(feedHideTimer);
+  feedHideTimer = setTimeout(function () {
+    const panel = document.getElementById('liveFeedPanel');
+    function finish() {
+      el.remove();
+      panel.classList.remove('has-item');
+      feedShowing = false;
+      feedHideTimer = null;
+      processFeedQueue();
+    }
+    if (reduceMotion) { finish(); return; }
+    el.classList.add('feedOut');
+    feedHideTimer = setTimeout(finish, 360);   // matches the 0.35s fade-out
+  }, duration);
+}
+
+function clearFeed() {
+  feedQueue = [];
+  feedShowing = false;
+  if (feedHideTimer) { clearTimeout(feedHideTimer); feedHideTimer = null; }
+  document.getElementById('liveFeedList').innerHTML = '';
+  document.getElementById('liveFeedPanel').classList.remove('has-item');
+}
+
+// ---------------- DIAGNOSTICS ----------------
+function renderDiagnostics(rawEventCount, lastReceived, liveConnected, liveUsername, dictionarySize) {
+  document.getElementById('rawCount').textContent = rawEventCount;
+  document.getElementById('lastReceived').textContent = lastReceived
+    ? (lastReceived.user + ': ' + lastReceived.text)
+    : '(none yet)';
+  document.getElementById('dictSize').textContent = Number(dictionarySize || 0).toLocaleString();
+  const liveStatusEl = document.getElementById('liveStatus');
+  if (liveUsername) {
+    liveStatusEl.textContent = 'Live target: @' + liveUsername + ' \u2014 ' + (liveConnected ? 'connected' : 'not connected');
+  } else {
+    liveStatusEl.textContent = '';
+  }
+}
+
+// ---------------- SOUND EFFECTS ----------------
+// Small synthesized beeps via the Web Audio API — no sound files needed, so
+// this always works the moment sound is enabled in Settings.
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) audioCtx = new Ctx();
+  }
+  return audioCtx;
+}
+function beep(freq, durationMs, type) {
+  if (!settings.soundEnabled) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') ctx.resume();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  const vol = Math.max(0, Math.min(1, settings.soundVolume));
+  gain.gain.setValueAtTime(vol * 0.25, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + durationMs / 1000);
+}
+function playCorrectSound(isSecret) {
+  beep(isSecret ? 880 : 660, 160, 'triangle');
+}
+function playRoundCompleteSound() {
+  [523, 659, 784, 1046].forEach(function (f, i) {
+    setTimeout(function () { beep(f, 220, 'triangle'); }, i * 110);
+  });
+}
+function playHintSound() { beep(440, 120, 'sine'); }
+
+// ---------------- TOAST + CELEBRATION ----------------
+let toastTimer = null;
+function showToast(message, ms) {
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () {
+    el.classList.add('hidden');
+  }, ms || 2400);
+}
+
+function launchConfetti() {
+  if (reduceMotion || !settings.confettiEnabled) return;
+  const box = document.getElementById('confetti');
+  box.innerHTML = '';
+  const colors = ['#ff6fae', '#ffd75e', '#8ee6c8', '#8ed2ff', '#c9b6ff', '#ffb58a'];
+  for (let i = 0; i < 44; i++) {
+    const bit = document.createElement('i');
+    bit.style.left = (Math.random() * 100) + '%';
+    bit.style.background = colors[i % colors.length];
+    bit.style.animationDuration = (2.2 + Math.random() * 2) + 's';
+    bit.style.animationDelay = (Math.random() * 0.8) + 's';
+    box.appendChild(bit);
+  }
+}
+
+// Small standalone renderer for the two round-complete leaderboard lists
+// (kept separate from fillLeaderboardList so the celebration card never
+// depends on which tab — This Round / All-Time — the main leaderboard panel
+// currently has open).
+function fillCelebrationList(el, entries, emptyText) {
+  el.innerHTML = '';
+  if (!entries.length) {
+    const empty = document.createElement('li');
+    empty.className = 'lbEmpty';
+    empty.textContent = emptyText;
+    el.appendChild(empty);
+    return;
+  }
+  entries.slice(0, 5).forEach(function (row, i) {
+    const li = document.createElement('li');
+    const rank = document.createElement('span');
+    rank.className = 'rank';
+    rank.textContent = (i + 1) + '.';
+    li.appendChild(rank);
+    if (settings.showAvatars) li.appendChild(makeAvatar(row.user, row.avatar));
+    const name = document.createElement('span');
+    name.className = 'lbName';
+    name.textContent = row.user;
+    li.appendChild(name);
+    const pts = document.createElement('span');
+    pts.className = 'lbPts';
+    pts.textContent = row.points + ' pts';
+    li.appendChild(pts);
+    el.appendChild(li);
+  });
+}
+
+let celebrationCountdownTimer = null;
+
+function stopCelebrationCountdown() {
+  if (celebrationCountdownTimer) { clearInterval(celebrationCountdownTimer); celebrationCountdownTimer = null; }
+}
+
+// Starts (or shows a static "waiting for host" message instead of) the
+// countdown to the next round. `roundEndsIn` is the number of ms the server
+// says it will wait before auto-advancing, or null when auto-advance is off
+// for the mode the game is in right now.
+function startCelebrationCountdown(roundEndsIn) {
+  stopCelebrationCountdown();
+  const el = document.getElementById('celebrationCountdown');
+  if (typeof roundEndsIn !== 'number' || roundEndsIn <= 0) {
+    el.textContent = 'Waiting for the host to start the next round\u2026';
+    el.classList.add('waiting');
+    return;
+  }
+  el.classList.remove('waiting');
+  const endAt = Date.now() + roundEndsIn;
+  function tick() {
+    const msLeft = endAt - Date.now();
+    if (msLeft <= 0) {
+      el.textContent = 'Starting next round\u2026';
+      stopCelebrationCountdown();
+      return;
+    }
+    const secLeft = Math.ceil(msLeft / 1000);
+    el.textContent = 'Next round in ' + secLeft + (secLeft === 1 ? ' second\u2026' : ' seconds\u2026');
+  }
+  tick();
+  celebrationCountdownTimer = setInterval(tick, 250);
+}
+
+// Shows the round-complete overlay: a celebratory header, the This-Round and
+// All-Time leaderboards (so the audience sees who won this round AND where
+// they stand overall), and a countdown to the next round. Stays open until
+// 'newRound' arrives (or the host/viewer taps it away).
+function showCelebration(roundEndsIn) {
+  const el = document.getElementById('celebration');
+  fillCelebrationList(document.getElementById('celebRoundLb'), lastRoundLeaderboard, 'No points yet this round');
+  fillCelebrationList(document.getElementById('celebAllTimeLb'), lastAllTimeLeaderboard, 'No points yet');
+  startCelebrationCountdown(roundEndsIn);
+  el.classList.remove('hidden');
+  launchConfetti();
+  playRoundCompleteSound();
+}
+
+function hideCelebration() {
+  stopCelebrationCountdown();
+  document.getElementById('celebration').classList.add('hidden');
+}
+
+document.getElementById('celebration').addEventListener('click', function (e) {
+  if (e.target.closest('#celebrationCard')) return;   // tapping the card itself shouldn't dismiss it
+  hideCelebration();
+});
+
+// ---------------- CONNECTION AWARENESS ----------------
+// If the game server is asleep or the network drops, buttons would silently do
+// nothing. This makes that visible, and lets actions warn instead of failing.
+function ensureConnected() {
+  if (socket.connected) return true;
+  showToast('Not connected to the game server yet. Reconnecting...', 3000);
+  return false;
+}
+
+// ---------------- MODES (Offline / Test / Live) ----------------
+let currentMode = 'offline';   // the mode the SERVER is really in
+let liveTabOpen = false;       // the person opened the Live tab to type a username
+
+// tab = which tab/panel is showing; the label always shows the server's real mode.
+function setActiveModeButton(tab) {
+  document.querySelectorAll('.modeBtn').forEach(function (btn) {
+    btn.classList.toggle('active', btn.dataset.mode === tab);
+  });
+  document.getElementById('modeLabel').textContent = currentMode.toUpperCase();
+  const pl = document.getElementById('modePickerLabel');
+  if (pl) pl.textContent = { live: 'Live - TikTok chat plays', test: 'Test - simulated viewers', offline: 'Offline - host types' }[tab] || tab;
+  const po = document.getElementById('modePickerOverlay'); if (po) po.hidden = true;
+  document.getElementById('offlinePanel').classList.toggle('visible', tab === 'offline');
+  document.getElementById('testPanel').classList.toggle('visible', tab === 'test');
+  document.getElementById('livePanel').classList.toggle('visible', tab === 'live');
+}
+
+document.querySelectorAll('.modeBtn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    const mode = btn.dataset.mode;
+    if (mode === 'live') {
+      liveTabOpen = true;
+      setActiveModeButton('live');
+      try { if (window.CraftSettings) CraftSettings.close(); } catch (e) { /* ignore */ }
+      return; // actual connect happens via the Connect button
+    }
+    liveTabOpen = false;
+    fetch(API + '/mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: mode })
+    }).catch(function (err) { console.error(err); });
+  });
+});
+
+// ---- Euler Stream API key (needed for Live mode) ----
+// The key box lives in the Live tab. The key is remembered in this browser
+// (localStorage) and, after a successful connect, on the server too, so the
+// host normally only has to paste it once. The server never sends the key back
+// to any screen; it only says whether it has one (hasApiKey / apiKeySource).
+const KEY_STORAGE = 'blossomEulerApiKey';
+const keyInput = document.getElementById('liveKeyInput');
+const keyToggleBtn = document.getElementById('liveKeyToggle');
+const keyForgetBtn = document.getElementById('liveKeyForget');
+const keyStatusEl = document.getElementById('liveKeyStatus');
+let serverHasKey = false;
+let serverKeySource = null;
+
+function readStoredKey() {
+  try { return localStorage.getItem(KEY_STORAGE) || ''; } catch (e) { return ''; }
+}
+function writeStoredKey(key) {
+  try {
+    if (key) localStorage.setItem(KEY_STORAGE, key);
+    else localStorage.removeItem(KEY_STORAGE);
+  } catch (e) { /* private mode etc.: the server still remembers it */ }
+}
+keyInput.value = readStoredKey();
+
+function renderKeyStatus() {
+  const hasTyped = !!keyInput.value.trim();
+  let html;
+  if (hasTyped) {
+    html = 'Key ready. It is saved after a successful connect.';
+  } else if (serverHasKey && serverKeySource === 'env') {
+    html = '\u2713 The server already has a key (from its environment settings). Leave this box empty to use it.';
+  } else if (serverHasKey) {
+    html = '\u2713 A key is saved on the server. Leave this box empty to use it.';
+  } else {
+    html = 'No key saved yet. Paste your Euler Stream API key above.';
+  }
+  keyStatusEl.innerHTML = html;   // static text only, no user input in here
+  keyInput.placeholder = serverHasKey ? 'Euler key (optional, server has one)' : 'Euler Stream API key';
+  keyForgetBtn.style.display = (hasTyped || serverKeySource === 'saved') ? '' : 'none';
+}
+keyInput.addEventListener('input', renderKeyStatus);
+
+keyToggleBtn.addEventListener('click', function () {
+  const showing = keyInput.type === 'text';
+  keyInput.type = showing ? 'password' : 'text';
+  keyToggleBtn.textContent = showing ? 'Show' : 'Hide';
+});
+
+keyForgetBtn.addEventListener('click', function () {
+  keyInput.value = '';
+  writeStoredKey('');
+  fetch(API + '/forget-api-key', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      serverHasKey = !!data.hasApiKey;
+      serverKeySource = data.apiKeySource || null;
+      renderKeyStatus();
+      showToast(serverHasKey ? 'Saved key removed (the server still has its own key)' : 'Euler key removed');
+    })
+    .catch(function (err) { showToast('Could not remove the key'); console.error(err); });
+});
+
+keyInput.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('liveConnectBtn').click();
+});
+
+document.getElementById('liveConnectBtn').addEventListener('click', function () {
+  const username = document.getElementById('liveUsernameInput').value.trim().replace(/^@+/, '');
+  if (!username) { showToast('Enter a TikTok username first'); return; }
+  const apiKey = keyInput.value.trim();
+  if (!apiKey && !serverHasKey) {
+    showToast('Paste your Euler Stream API key in the key box first (free at eulerstream.com)', 4500);
+    keyInput.focus();
+    return;
+  }
+  showToast('Connecting to @' + username + '...');
+  fetch(API + '/start-live', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username, apiKey: apiKey })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.ok) {
+        showToast('Live connect failed: ' + data.error, 5000);
+        if (data.needsKey) keyInput.focus();
+      } else {
+        if (apiKey) writeStoredKey(apiKey);   // it worked, so remember it on this device
+        showToast('Connected to @' + username);
+      }
+    })
+    .catch(function (err) { showToast('Live connect failed'); console.error(err); });
+});
+
+document.getElementById('liveUsernameInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('liveConnectBtn').click();
+});
+
+document.getElementById('liveDisconnectBtn').addEventListener('click', function () {
+  fetch(API + '/stop-live', { method: 'POST' })
+    .then(function () { showToast('Disconnected from TikTok LIVE'); })
+    .catch(function (err) { console.error(err); });
+});
+
+// ---------------- FULLSCREEN + HIDE CONTROLS ----------------
+// Real fullscreen where the browser allows it (desktop, Android). iPhone Safari
+// cannot fullscreen a web page, so there the button switches to "immersive" mode:
+// the same clean layout with the browser bar hidden as far as the phone allows
+// (add the page to the Home Screen for a true full-screen app).
+const rootEl = document.documentElement;
+const fsBtn = document.getElementById('fsBtn');
+
+function realFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+function canRealFullscreen() {
+  return !!(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen);
+}
+function syncFullscreenUi() {
+  const on = !!realFullscreenElement() || rootEl.classList.contains('immersive');
+  rootEl.classList.toggle('fs', on);
+  fsBtn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Enter fullscreen');
+  fsBtn.title = (on ? 'Exit fullscreen' : 'Fullscreen') + ' (F)';
+  fsBtn.classList.toggle('on', on);
+  setViewportHeight();
+}
+function toggleFullscreen() {
+  if (realFullscreenElement()) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    return;
+  }
+  if (rootEl.classList.contains('immersive')) {
+    rootEl.classList.remove('immersive');
+    syncFullscreenUi();
+    return;
+  }
+  if (canRealFullscreen()) {
+    // Fullscreen the whole page (not one element) so toasts and the
+    // celebration overlay stay visible.
+    const req = (rootEl.requestFullscreen || rootEl.webkitRequestFullscreen).call(rootEl);
+    if (req && typeof req.catch === 'function') {
+      req.catch(function () {
+        rootEl.classList.add('immersive');   // browser refused: fall back
+        syncFullscreenUi();
+      });
+    }
+  } else {
+    rootEl.classList.add('immersive');
+    syncFullscreenUi();
+    window.scrollTo(0, 1);
+  }
+}
+fsBtn.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', syncFullscreenUi);
+document.addEventListener('webkitfullscreenchange', syncFullscreenUi);
+
+// Clean view: hides the mode bar, host controls and diagnostics so only the game shows.
+function setControlsHidden(hidden) {
+  rootEl.classList.toggle('hide-controls', hidden);
+  setViewportHeight();
+  if (hidden) showToast('Controls hidden. Press H or tap the gear to bring them back.', 3200);
+}
+document.getElementById('hideBtn').addEventListener('click', function () { setControlsHidden(true); });
+document.getElementById('showControlsBtn').addEventListener('click', function () { setControlsHidden(false); });
+
+// Keyboard: F = fullscreen, H = hide/show controls, L = leaderboard (ignored while typing).
+document.addEventListener('keydown', function (e) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const k = (e.key || '').toLowerCase();
+  if (k === 'l') { e.preventDefault(); if (lbOverlay.classList.contains('hidden')) openLeaderboard(); else closeLeaderboard(); return; }
+  if (k === 'f') { e.preventDefault(); toggleFullscreen(); }
+  else if (k === 'h') { e.preventDefault(); setControlsHidden(!rootEl.classList.contains('hide-controls')); }
+});
+
+// ---------------- OFFLINE + TEST CONTROLS ----------------
+document.getElementById('offlineSubmit').addEventListener('click', function () {
+  const input = document.getElementById('offlineInput');
+  if (!input.value.trim() || !ensureConnected()) return;
+  socket.emit('guess', { text: input.value, user: 'You' });
+  input.value = '';
+});
+document.getElementById('offlineInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('offlineSubmit').click();
+});
+
+// The server picks a random unfound secret word and "types" it as a fake viewer.
+document.getElementById('testAutoBtn').addEventListener('click', function () {
+  if (!ensureConnected()) return;
+  socket.emit('hostAction', { type: 'simulate' });
+});
+
+// One stable pretend-viewer identity per browser tab/session, so repeated
+// custom test guesses accumulate onto the same name on the leaderboard
+// instead of each click minting a brand-new one-off viewer with a single
+// guess to their name.
+const testCustomFakeUser = 'TestViewer_' + Math.floor(Math.random() * 900 + 100);
+document.getElementById('testCustomBtn').addEventListener('click', function () {
+  const input = document.getElementById('testCustomInput');
+  if (!input.value.trim() || !ensureConnected()) return;
+  socket.emit('guess', { text: input.value, user: testCustomFakeUser });
+  input.value = '';
+});
+document.getElementById('testCustomInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('testCustomBtn').click();
+});
+
+// ---------------- HOST CONTROLS ----------------
+document.getElementById('hostSubmit').addEventListener('click', function () {
+  const input = document.getElementById('hostInput');
+  if (!input.value.trim() || !ensureConnected()) return;
+  socket.emit('guess', { text: input.value, user: 'Host' });
+  input.value = '';
+});
+document.getElementById('hostInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('hostSubmit').click();
+});
+
+// Skip: the server moves to the next round and pushes the new state to every
+// screen. The button pauses briefly so a double-click cannot skip two rounds.
+const skipBtn = document.getElementById('hostSkip');
+skipBtn.addEventListener('click', function () {
+  if (skipBtn.disabled || !ensureConnected()) return;
+  skipBtn.disabled = true;
+  setTimeout(function () { skipBtn.disabled = false; }, Math.max(200, settings.skipCooldownMs || 600) + 200);
+  socket.emit('hostAction', { type: 'skipRound' });
+});
+
+document.getElementById('hostHint').addEventListener('click', function () {
+  if (!ensureConnected()) return;
+  socket.emit('hostAction', { type: 'hint' });
+});
+
+document.getElementById('hostPause').addEventListener('click', function () {
+  if (!ensureConnected()) return;
+  socket.emit('hostAction', { type: 'togglePause' });
+});
+
+document.getElementById('hostGotoBtn').addEventListener('click', function () {
+  const input = document.getElementById('hostGotoRound');
+  const n = parseInt(input.value, 10);
+  if (!n || !ensureConnected()) return;
+  socket.emit('hostAction', { type: 'gotoRound', index: n });
+  input.value = '';
+});
+document.getElementById('hostGotoRound').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('hostGotoBtn').click();
+});
+
+document.getElementById('hostReset').addEventListener('click', function () {
+  if (!ensureConnected()) return;
+  if (!window.confirm('Reset the ALL-TIME leaderboard to zero for every viewer? This cannot be undone.')) return;
+  socket.emit('hostAction', { type: 'resetScores' });
+});
+
+document.getElementById('hostExport').addEventListener('click', function () {
+  window.open('/api/export-leaderboard', '_blank');
+});
+
+document.getElementById('hostResetRound').addEventListener('click', function () {
+  if (!ensureConnected()) return;
+  if (!window.confirm('Reset THIS ROUND\'s leaderboard to zero? All-time scores are not affected.')) return;
+  socket.emit('hostAction', { type: 'resetRoundScores' });
+});
+
+document.querySelectorAll('.lbViewBtn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    leaderboardView = btn.dataset.view;
+    renderLeaderboard(currentLeaderboardEntries());
+  });
+});
+
+// ---------------- LEADERBOARD MODAL (top toolbar trophy button) ----------------
+const lbOverlay = document.getElementById('lbOverlay');
+function openLeaderboard() {
+  renderLeaderboard(currentLeaderboardEntries());
+  lbOverlay.classList.remove('hidden');
+}
+function closeLeaderboard() { lbOverlay.classList.add('hidden'); }
+document.getElementById('leaderboardBtn').addEventListener('click', openLeaderboard);
+document.getElementById('lbCloseBtn').addEventListener('click', closeLeaderboard);
+lbOverlay.addEventListener('click', function (e) { if (e.target === lbOverlay) closeLeaderboard(); });
+// the modal's action buttons reuse the host-panel handlers (same confirmations)
+document.getElementById('lbResetRoundBtn').addEventListener('click', function () { document.getElementById('hostResetRound').click(); });
+document.getElementById('lbResetAllBtn').addEventListener('click', function () { document.getElementById('hostReset').click(); });
+document.getElementById('lbExportBtn').addEventListener('click', function () { document.getElementById('hostExport').click(); });
+
+// ---------------- TEST MODE: AUTO-ANSWER BOT TOGGLE ----------------
+document.getElementById('testAutoBotBtn').addEventListener('click', function () {
+  if (!ensureConnected()) return;
+  socket.emit('hostAction', { type: 'toggleAutoBot' });
+});
+
+// ---------------- THEME PICKER (toolbar dropdown) ----------------
+// Builds the Settings panel's <select> options and the toolbar dropdown's
+// list items from the single THEMES array above, so both stay in sync.
+const setBoardThemeSelect = document.getElementById('setBoardTheme');
+BOARD_THEMES.forEach(function (t) {
+  const opt = document.createElement('option');
+  opt.value = t.id;
+  opt.textContent = t.icon + '  ' + t.name;
+  setBoardThemeSelect.appendChild(opt);
+});
+
+// update 146: theme colours are handled by the platform (/shared/theme.js)
+function updateThemeUi() {}
+
+// ---------------- SETTINGS PANEL ----------------
+const settingsOverlay = document.getElementById('settingsOverlay');
+const settingsFields = {
+  boardTheme: document.getElementById('setBoardTheme'),
+  showAvatars: document.getElementById('setShowAvatars'),
+  avatarSize: document.getElementById('setAvatarSize'),
+  boardAnimationEnabled: document.getElementById('setBoardAnim'),
+  confettiEnabled: document.getElementById('setConfetti'),
+  compactMode: document.getElementById('setCompact'),
+  showDiagnostics: document.getElementById('setDiagnostics'),
+  showRecentFeed: document.getElementById('setShowFeed'),
+  recentFeedSize: document.getElementById('setFeedSize'),
+  feedItemDurationMs: document.getElementById('setFeedItemDuration'), // seconds in UI
+  leaderboardSize: document.getElementById('setLeaderboardSize'),
+  bonusWordsEnabled: document.getElementById('setBonusEnabled'),
+  pointsMultiplier: document.getElementById('setPointsMultiplier'),
+  minGuessLength: document.getElementById('setMinGuessLength'),
+  hintCooldownMs: document.getElementById('setHintCooldown'),     // seconds in UI
+  hintDurationMs: document.getElementById('setHintDuration'),     // seconds in UI
+  skipCooldownMs: document.getElementById('setSkipCooldown'),
+  autoAdvanceLive: document.getElementById('setAutoAdvanceLive'),
+  autoAdvanceOffline: document.getElementById('setAutoAdvanceOffline'),
+  autoAdvanceEnabled: document.getElementById('setAutoAdvanceEnabled'),   // Test Mode
+  autoAdvanceDelayMs: document.getElementById('setAutoAdvance'),  // seconds in UI
+  autoBotEnabled: document.getElementById('setAutoBotEnabled'),
+  soundEnabled: document.getElementById('setSoundEnabled'),
+  soundVolume: document.getElementById('setSoundVolume')
+};
+const MS_TO_SEC_FIELDS = ['hintCooldownMs', 'hintDurationMs', 'autoAdvanceDelayMs', 'feedItemDurationMs'];
+
+let suppressSettingsEvents = false;
+function populateSettingsForm() {
+  suppressSettingsEvents = true;
+  Object.keys(settingsFields).forEach(function (key) {
+    const field = settingsFields[key];
+    if (!field) return;
+    let val = settings[key];
+    if (MS_TO_SEC_FIELDS.indexOf(key) !== -1) val = Math.round(val / 1000);
+    if (field.type === 'checkbox') field.checked = !!val;
+    else field.value = val;
+  });
+  suppressSettingsEvents = false;
+}
+
+function applySettingsToDom() {
+  updateThemeUi();
+  document.documentElement.setAttribute('data-avatar', settings.avatarSize || 'medium');
+  document.documentElement.classList.toggle('hide-avatars', !settings.showAvatars);
+  document.documentElement.classList.toggle('no-board-anim', !settings.boardAnimationEnabled);
+  document.documentElement.classList.toggle('compact', !!settings.compactMode);
+  const feedWasHidden = document.documentElement.classList.contains('hide-feed');
+  document.documentElement.classList.toggle('hide-feed', !settings.showRecentFeed);
+  if (!settings.showRecentFeed && !feedWasHidden) clearFeed();
+  document.getElementById('diagnostics').style.display = settings.showDiagnostics ? '' : 'none';
+  const pauseBtn = document.getElementById('hostPause');
+  pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause';
+  pauseBtn.classList.toggle('active', !!settings.paused);
+
+  // Host-panel quick toggle: always acts on the mode the game is really in.
+  const autoNextBtn = document.getElementById('hostAutoNext');
+  const autoNextOn = !!settings[autoAdvanceKeyForMode(currentMode)];
+  autoNextBtn.textContent = 'Auto-Next: ' + (autoNextOn ? 'On' : 'Off');
+  autoNextBtn.classList.toggle('active', autoNextOn);
+
+  const autoBotBtn = document.getElementById('testAutoBotBtn');
+  autoBotBtn.textContent = 'Auto-Answer: ' + (settings.autoBotEnabled ? 'On' : 'Off');
+  autoBotBtn.classList.toggle('active', !!settings.autoBotEnabled);
+}
+
+// Which setting controls automatic next-round for a given mode.
+function autoAdvanceKeyForMode(mode) {
+  if (mode === 'live') return 'autoAdvanceLive';
+  if (mode === 'offline') return 'autoAdvanceOffline';
+  return 'autoAdvanceEnabled';   // test mode
+}
+
+function sendSettingsUpdate(partial) {
+  if (!ensureConnected()) return;
+  socket.emit('hostAction', { type: 'updateSettings', settings: partial });
+}
+
+document.getElementById('hostAutoNext').addEventListener('click', function () {
+  const key = autoAdvanceKeyForMode(currentMode);
+  const partial = {};
+  partial[key] = !settings[key];
+  sendSettingsUpdate(partial);   // the button label updates when the server confirms
+});
+
+Object.keys(settingsFields).forEach(function (key) {
+  const field = settingsFields[key];
+  if (!field) return;
+  const evt = (field.type === 'checkbox' || field.tagName === 'SELECT') ? 'change' : 'input';
+  field.addEventListener(evt, function () {
+    if (suppressSettingsEvents) return;
+    let val;
+    if (field.type === 'checkbox') val = field.checked;
+    else if (field.type === 'number' || field.type === 'range') val = parseFloat(field.value);
+    else val = field.value;
+    if (MS_TO_SEC_FIELDS.indexOf(key) !== -1) val = Math.round(val * 1000);
+    const partial = {};
+    partial[key] = val;
+    sendSettingsUpdate(partial);
+    const note = document.getElementById('settingsSavedNote');
+    note.textContent = 'Saved';
+    setTimeout(function () { note.textContent = ''; }, 1200);
+  });
+});
+
+document.getElementById('settingsBtn').addEventListener('click', function () {
+  populateSettingsForm();
+  settingsOverlay.hidden = false;
+});
+document.getElementById('settingsCloseBtn').addEventListener('click', function () {
+  settingsOverlay.hidden = true;
+});
+settingsOverlay.addEventListener('click', function (e) {
+  if (e.target === settingsOverlay) settingsOverlay.hidden = true;
+});
+
+// Escape closes whichever modal is open
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  lbOverlay.classList.add('hidden');
+  settingsOverlay.hidden = true;
+});
+
+// ---------------- SOCKET EVENTS ----------------
+let currentCenter = '';
+
+function applyState(s) {
+  if (!s) return;
+  currentMode = s.mode;
+  currentCenter = s.center;
+  if (s.settings) settings = s.settings;
+  applySettingsToDom();
+  serverHasKey = !!s.hasApiKey;
+  serverKeySource = s.apiKeySource || null;
+  renderKeyStatus();
+  if (s.mode === 'live') liveTabOpen = false;
+  // Stay on the Live tab while the person is typing a username, even if other
+  // screens cause a state update in the meantime.
+  setActiveModeButton(liveTabOpen ? 'live' : s.mode);
+  renderBoard(s.letters, s.center);
+  renderRules(s);
+  renderLengthChips(s);
+  renderSlots(s.slots);
+  renderBonus(s.bonusCount, s.bonusRecent);
+  lastRoundLeaderboard = s.roundLeaderboard || [];
+  lastAllTimeLeaderboard = s.leaderboard || [];
+  renderLeaderboard(currentLeaderboardEntries());
+  renderDiagnostics(s.rawEventCount, s.lastReceived, s.liveConnected, s.liveUsername, s.dictionarySize);
+}
+
+socket.on('state', applyState);
+
+let wasDisconnected = false;
+socket.on('disconnect', function () {
+  wasDisconnected = true;
+  showToast('Connection lost. Reconnecting...', 4000);
+});
+socket.on('connect', function () {
+  if (wasDisconnected) { wasDisconnected = false; showToast('Reconnected'); }
+});
+
+socket.on('wordFound', function (data) {
+  boingBoard();
+  playCorrectSound(data.secret);
+  // The docked live guess feed below is the only pop-up for a found word
+  // (no separate toast, which used to float over the instructions).
+  queueFeedItem({ user: data.user, word: data.word, points: data.points, secret: data.secret, avatar: data.avatar });
+});
+
+socket.on('roundComplete', function (s) {
+  applyState(s);   // updates lastRoundLeaderboard / lastAllTimeLeaderboard first
+  showCelebration(s.roundEndsIn);
+});
+
+// A new round started (auto after a win, or the host skipped): show it right away.
+socket.on('newRound', function (s) {
+  hideCelebration();
+  clearFeed();
+  applyState(s);
+  showToast('New round!');
+});
+
+socket.on('hint', function (data) {
+  playHintSound();
+  showToast('Hint: starts with ' + data.letter + ', ' + data.length + ' letters', data.durationMs || 5000);
+});
+
+socket.on('notice', function (data) {
+  showToast(data.message);
+});
+
+// Explains why a typed guess was not accepted (chat guesses stay silent).
+socket.on('guessRejected', function (data) {
+  const word = data.word || '';
+  const messages = {
+    tooShort: 'Words need at least ' + settings.minGuessLength + ' letters',
+    alreadyFound: word + ' was already found',
+    wrongLetters: 'Use only the 7 letters on the board',
+    missingCenter: 'Every word must use the center letter (' + currentCenter + ')',
+    notAWord: word + ' is not in the dictionary',
+    bonusDisabled: 'Bonus words are turned off right now',
+    paused: 'The game is paused'
+  };
+  showToast(messages[data.reason] || 'Guess not accepted');
+});
+
+socket.on('diagnostics', function (data) {
+  document.getElementById('rawCount').textContent = data.rawEventCount;
+  document.getElementById('lastReceived').textContent = data.lastReceived
+    ? (data.lastReceived.user + ': ' + data.lastReceived.text)
+    : '(none yet)';
+});
+
+// ---- update 146: platform chrome wiring (mode picker, how-to modal) ----
+(function platformChrome() {
+  var pickBtn = document.getElementById('modePickerBtn');
+  var pickOv = document.getElementById('modePickerOverlay');
+  var badge = document.getElementById('modeLabel');
+  function openPick() { if (pickOv) pickOv.hidden = false; }
+  if (pickBtn) pickBtn.addEventListener('click', openPick);
+  if (badge) badge.addEventListener('click', openPick);
+  if (pickOv) pickOv.addEventListener('click', function (e) { if (e.target === pickOv) pickOv.hidden = true; });
+  var help = document.getElementById('helpBtn');
+  var howTo = document.getElementById('howToOverlay');
+  function closeHow() { if (howTo) howTo.hidden = true; }
+  if (help && howTo) help.addEventListener('click', function () { howTo.hidden = false; });
+  ['closeHowTo', 'closeHowTo2'].forEach(function (id) { var b = document.getElementById(id); if (b) b.addEventListener('click', closeHow); });
+  if (howTo) howTo.addEventListener('click', function (e) { if (e.target === howTo) closeHow(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeHow(); if (pickOv) pickOv.hidden = true; } });
+})();

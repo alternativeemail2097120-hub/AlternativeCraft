@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, minimum-scale=1, user-scalable=no" />
+<title>MEMORY MATCH — Live Card Game</title>
+<meta name="description" content="A live memory card matching game played by TikTok LIVE chat." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Fredoka:wght@400;500;600;700&family=Baloo+2:wght@500;700&family=Lilita+One&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<script src="/shared/session.js"></script>
+<script src="/shared/platform-sync.js"></script>
+<link rel="stylesheet" href="memory-style.css" />
+<link rel="stylesheet" href="/shared/game-chrome.css" />
+<link rel="stylesheet" href="/shared/settings-shell.css" />
+<script src="/shared/title-font.js" defer></script>
+<script src="/shared/score-ticker.js"></script>
+<script src="/shared/settings-shell.js"></script>
+<link rel="stylesheet" href="/shared/fit-screen.css" />
+<script src="/shared/fit-screen.js"></script>
+</head>
+<body data-game="memory">
+  <div class="confettiLayer" id="confettiLayer" aria-hidden="true"></div>
+
+  <div class="app" id="app">
+    <div class="heroBand" id="heroBand">
+      <h1 class="heroTitle">MEMORY MATCH</h1>
+      <p class="heroTagline">Flip two cards by number and find the matching pairs. Chat plays live - combos earn bonus points!</p>
+    </div>
+
+    <header class="topbar">
+      <div class="brandRow">
+        <span class="brandDot" id="brandDot"></span>
+        <div class="brandText">
+          <div class="brandTitle">MEMORY MATCH</div>
+          <div class="brandSubtitle">chat-powered card game</div>
+        </div>
+      </div>
+      <div class="toolbarRow">
+        <a href="/" class="iconBtn" id="homeBtn" aria-label="Choose another game">🏠</a>
+        <span class="modeBadge" id="modeBadge">OFFLINE</span>
+        <div class="toolbar-dropdown" id="difficultyDropdown">
+          <button type="button" id="difficultyDropdownBtn" class="iconBtn toolbar-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Difficulty: Easy" title="Difficulty: Easy">
+            <span id="difficultyDropdownIcon" class="diff-badge level-2">2</span>
+          </button>
+          <ul id="difficultyDropdownMenu" class="toolbar-dropdown-menu" role="listbox" aria-label="Difficulty" hidden>
+            <li role="option" data-value="1" aria-selected="false"><span class="diff-badge level-1">1</span><span class="dd-label">Warmup <small>20 cards</small></span></li>
+            <li role="option" data-value="2" aria-selected="true" class="dd-active"><span class="diff-badge level-2">2</span><span class="dd-label">Easy <small>36 cards</small></span></li>
+            <li role="option" data-value="3" aria-selected="false"><span class="diff-badge level-3">3</span><span class="dd-label">Medium <small>48 cards</small></span></li>
+            <li role="option" data-value="4" aria-selected="false"><span class="diff-badge level-4">4</span><span class="dd-label">Hard <small>64 cards</small></span></li>
+            <li role="option" data-value="5" aria-selected="false"><span class="diff-badge level-5">5</span><span class="dd-label">Chaos <small>96 cards</small></span></li>
+          </ul>
+        </div>
+        <button class="iconBtn" id="newGameTopBtn" type="button" aria-label="New game" title="New game">↻</button>
+        <button class="iconBtn" id="peekTopBtn" type="button" aria-label="Peek: show every card for a moment" title="Peek: show every card for a moment">👁️</button>
+        <button class="iconBtn" id="revealPairTopBtn" type="button" aria-label="Reveal 1 pair" title="Reveal 1 pair (no points)">✨</button>
+        <button class="iconBtn" id="helpBtn" type="button" aria-label="How to play">❓</button>
+        <button class="iconBtn" id="leaderboardTopBtn" type="button" aria-label="Leaderboard">🏆</button>
+        <button class="iconBtn" id="settingsBtn" type="button" aria-label="Settings">⚙️</button>
+        <button class="iconBtn" id="fullscreenBtn" type="button" aria-label="Enter fullscreen">⛶</button>
+      </div>
+    </header>
+
+    <div class="toastSlot"><div id="liveGuessToastArea" class="live-guess-toast-area" aria-live="polite"></div></div>
+
+    <main class="stage" id="stage">
+      <section class="round-card">
+        <div class="quick-hint" id="chatFormatHint">Chat format: <span class="mono highlight">1 5</span> flips cards <b>1</b> and <b>5</b></div>
+
+        <div id="playerGuessBar" class="player-guess-bar" hidden>
+          <div class="player-guess-bar-head">
+            <span class="player-guess-bar-label">Players</span>
+            <button id="playerGuessBarToggle" type="button" class="player-guess-bar-toggle" aria-label="Hide guess controls">&#9650; Hide</button>
+          </div>
+          <div id="teamPlayerChips" class="team-player-chips" hidden></div>
+          <p id="teamGuessHint" class="hint player-guess-hint" hidden>Tap your name, then tap two cards on the board.</p>
+          <p id="soloGuessHint" class="hint player-guess-hint">Tap two cards on the board to guess, or type below.</p>
+          <div class="field-row player-guess-input-row">
+            <input id="offlineGuessInput" type="text" inputmode="numeric" placeholder="Or type a guess, e.g. 1 5" autocomplete="off">
+            <button id="offlineGuessBtn" class="btn btnGold" type="button">Submit</button>
+          </div>
+        </div>
+
+        <div class="puzzle-topline">
+          <span id="liveStatusMini" class="live-status-mini status-idle">&#9679; Offline</span>
+          <span id="pairsCounter" class="pairs-counter">&#127183; 0/0 pairs</span>
+          <span id="solvedBanner" class="solved-banner" hidden>ALL MATCHED!</span>
+          <span id="stopwatch" class="stopwatch" title="Time elapsed - there is no time limit">&#9201; 00:00</span>
+        </div>
+        <div id="autoNextCountdown" class="auto-next-countdown" hidden></div>
+
+        <div class="gridWrap"><div id="memoryGrid" class="memory-grid"></div></div>
+
+        <div class="live-scoreboard" id="liveScoreboard">
+          <div class="live-score-col"><h3>&#127942; This Round</h3><ol id="liveRoundList" class="live-score-list"></ol></div>
+          <div class="live-score-col"><h3>&#11088; All-Time</h3><ol id="liveAllTimeList" class="live-score-list"></ol></div>
+        </div>
+      </section>
+    </main>
+
+    <button id="hostConsoleShowBtn" class="host-console-show-btn" type="button" aria-label="Show host console" hidden>&#9000; Console</button>
+    <footer class="host-console-bar" id="hostConsoleBar">
+      <div class="host-console-head">
+        <span class="host-console-label">Host Console</span>
+        <button id="hostConsoleToggle" class="host-console-toggle" type="button" aria-label="Hide host console">&#9660; Hide</button>
+      </div>
+      <div class="host-console-row" id="hostConsoleRow">
+        <input id="hostConsoleInput" type="text" placeholder="Host console: 1 5" autocomplete="off">
+        <button id="hostConsoleBtn" class="btn btnGold" type="button">Send</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Round-end window -->
+  <div id="roundEndOverlay" class="round-end-overlay" hidden>
+    <div class="round-end-card">
+      <div class="round-end-head">
+        <h2 id="roundEndTitle">This Round's Top Scorers</h2>
+        <button id="roundEndCloseBtn" class="iconBtn" type="button" aria-label="Close">✕</button>
+      </div>
+      <p id="roundEndSummary" class="round-end-summary"></p>
+      <ol id="roundEndList" class="round-end-list"></ol>
+      <div id="roundEndCountdown" class="round-end-countdown" hidden></div>
+      <div class="round-end-actions"><button id="roundEndNewGameBtn" class="btn btnGold" type="button">Start new game</button></div>
+    </div>
+  </div>
+
+  <!-- Leaderboard drawer -->
+  <div class="drawerOverlay" id="leaderboardOverlay" hidden>
+    <div class="drawer">
+      <div class="drawerHead">
+        <h3>Leaderboard</h3>
+        <button class="iconBtn" id="leaderboardModalCloseBtn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="tabRow">
+        <button type="button" class="tabBtn lb-modal-tab active" data-lb-tab="round">This round</button>
+        <button type="button" class="tabBtn lb-modal-tab" data-lb-tab="alltime">All-time</button>
+        <button type="button" class="tabBtn lb-modal-tab" id="lbTeamsTab" data-lb-tab="teams" hidden>Teams</button>
+      </div>
+      <button id="lbResetBtn" type="button" class="btn btnDanger btnFull lb-reset-btn">Reset scores in this tab</button>
+      <ol id="leaderboardModalRoundList" class="round-end-list"></ol>
+      <ol id="leaderboardModalAllTimeList" class="round-end-list capped-20" hidden></ol>
+      <ol id="leaderboardModalTeamsList" class="round-end-list team-standings-list" hidden></ol>
+    </div>
+  </div>
+
+  <!-- Settings drawer (turned into the platform settings workspace by /shared/settings-shell.js) -->
+  <div class="drawerOverlay" id="settingsOverlay" hidden>
+    <div class="drawer">
+      <div class="drawerHead">
+        <h3>Settings</h3>
+        <button class="iconBtn" id="closeSettings" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="statusChips">
+        <div class="statusChip" id="modeChip">Mode: —</div>
+        <div class="statusChip" id="connChip">TikTok: not connected</div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Appearance</h4>
+        <p class="sectionNote">Pick the platform color or one of the cute "Box colors &amp; looks" designs. It is shared by every game.</p>
+        <label class="theme-picker">
+          🎨
+          <select data-theme-select aria-label="Platform theme color">
+            <option value="cream">Cream</option>
+            <option value="blue">Sky Blue</option>
+            <option value="green">Meadow Green</option>
+            <option value="pink">Blossom Pink</option>
+            <option value="violet">Lavender Violet</option>
+            <option value="honey">Honey Gold</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Title font</h4>
+        <p class="sectionNote">Pick the font used for the game name at the top of the screen. Saved on this device and shared by every game.</p>
+        <div data-title-font-picker></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Mode</h4>
+        <button class="pickerRow" id="modePickerBtn" type="button">
+          <span id="modePickerLabel">Offline — host plays solo</span>
+          <span class="chev">▾</span>
+        </button>
+      </div>
+
+      <div class="drawerSection" data-panel="live" id="tiktokSection" hidden>
+        <h4>TikTok auto-chat</h4>
+        <p class="sectionNote" id="liveKeyHintManual">Connects to your LIVE room and feeds real chat guesses into the game. Needs a Sign API Key (set on the server, or typed below).</p>
+        <p class="sectionNote" id="liveKeyHintDefault" hidden>A Sign API Key is already set on the server - just enter your TikTok username and tap Connect.</p>
+        <label class="fieldLabel">Your TikTok username</label>
+        <input id="tiktokUsername" class="textInput" placeholder="e.g. yourhandle (no @)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <input id="tiktokApiKey" class="textInput" type="password" placeholder="EulerStream Sign API Key" autocomplete="off" />
+        <div class="row">
+          <button id="connectLiveBtn" class="btn btnGold" type="button">Connect</button>
+          <button id="disconnectLiveBtn" class="btn btnGhost" type="button">Disconnect</button>
+        </div>
+        <div id="liveStatus" class="status-line status-idle">Not connected.</div>
+      </div>
+
+      <div class="drawerSection" data-panel="test" hidden>
+        <h4>Test tools</h4>
+        <p class="sectionNote">No login needed. Use this to try the game before going live.</p>
+        <div class="row"><button id="simulateBtn" class="btn btnGold" type="button">Simulate random fake chat</button></div>
+        <input id="testCustomText" class="textInput" type="text" placeholder="Or type a fake comment, e.g. 1 5" autocomplete="off" />
+        <div class="row"><button id="testCustomBtn" class="btn btnGhost" type="button">Send as fake viewer</button></div>
+        <label class="switchRow">
+          <input type="checkbox" id="botsToggle" />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Auto-play (bots) <small>A few fake viewers keep guessing until every pair is found.</small></span>
+        </label>
+      </div>
+
+      <div class="drawerSection" data-panel="offline">
+        <h4>Multiplayer &amp; solo</h4>
+        <p class="sectionNote">Play the board yourself, or set up Multiplayer Teams. Once a game is running, guesses are entered from the main game screen - tap your name, then tap two cards.</p>
+        <div class="teams-box">
+          <p class="sectionNote">Add each player's name, choose Teams or Without Team, then tap Start. Colors are assigned randomly.</p>
+          <div class="grouping-tabs" id="groupingTabs">
+            <button type="button" class="grouping-btn active" data-grouping="team">Teams</button>
+            <button type="button" class="grouping-btn" data-grouping="solo">Without Team</button>
+          </div>
+          <div class="field-row" id="teamGroupedFields">
+            <select id="teamCountSelect" class="textInput" aria-label="Number of teams">
+              <option value="2" selected>2 Teams</option>
+              <option value="3">3 Teams</option>
+              <option value="4">4 Teams</option>
+            </select>
+            <select id="teamSizeSelect" class="textInput" aria-label="Players per team">
+              <option value="1">1 vs 1 (1 player/team)</option>
+              <option value="2" selected>2 vs 2 (2 players/team)</option>
+              <option value="3">3 vs 3 (3 players/team)</option>
+              <option value="4">4 vs 4 (4 players/team)</option>
+              <option value="5">5 vs 5 (5 players/team)</option>
+            </select>
+          </div>
+          <div class="field-row" id="soloGroupedFields" hidden>
+            <select id="soloCountSelect" class="textInput" aria-label="Number of players">
+              <option value="2">1 vs 1 (2 players)</option>
+              <option value="3">1 vs 1 vs 1 (3 players)</option>
+              <option value="4">1 vs 1 vs 1 vs 1 (4 players)</option>
+              <option value="5" selected>5 players</option>
+              <option value="6">6 players</option>
+            </select>
+          </div>
+          <div id="teamNameInputs" class="team-name-inputs"></div>
+          <div class="row">
+            <button id="startTeamsBtn" type="button" class="btn btnGold">Start game</button>
+            <button id="clearTeamsBtn" type="button" class="btn btnGhost">Clear</button>
+          </div>
+          <div id="teamRoster" class="team-roster" hidden></div>
+        </div>
+      </div>
+
+      <div class="drawerSection emoji-pack-row">
+        <h4>Card symbols</h4>
+        <p class="sectionNote">Pick what the cards show. Changing this starts a fresh game at the current difficulty.</p>
+        <div class="emoji-pack-grid" id="emojiPackGrid"></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Game</h4>
+        <label class="fieldLabel" for="difficultySelect">Difficulty</label>
+        <select id="difficultySelect" class="textInput" aria-label="Difficulty">
+          <option value="1">1 · Warmup (20 cards)</option>
+          <option value="2" selected>2 · Easy (36 cards)</option>
+          <option value="3">3 · Medium (48 cards)</option>
+          <option value="4">4 · Hard (64 cards)</option>
+          <option value="5">5 · Chaos (96 cards)</option>
+        </select>
+        <div class="row"><button id="newGameBtn" class="btn btnGhost" type="button">New game</button></div>
+        <label class="switchRow">
+          <input type="checkbox" id="autoNextToggle" />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Auto next game <small>Starts a new game a few seconds after every win.</small></span>
+        </label>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Timing</h4>
+        <p class="sectionNote">How long each floating window stays up, how long a wrong pair stays face-up, and the pause before the next game. The first three are saved on this device; the other three are shared with every screen.</p>
+        <div class="timing-grid">
+          <label class="timing-field">Guess pop-up (sec)<input type="number" id="toastDurationInput" class="textInput" min="1" max="20" step="0.5"></label>
+          <label class="timing-field">Round scorers window (sec)<input type="number" id="roundWindowDurationInput" class="textInput" min="2" max="60" step="1"></label>
+          <label class="timing-field">All-time window (sec)<input type="number" id="allTimeWindowDurationInput" class="textInput" min="2" max="60" step="1"></label>
+          <label class="timing-field">Next game delay (sec)<input type="number" id="autoNextDelayInput" class="textInput" min="3" max="300" step="1"></label>
+          <label class="timing-field">Wrong pair shown (sec)<input type="number" id="mismatchDelayInput" class="textInput" min="0.5" max="5" step="0.1"></label>
+          <label class="timing-field">Peek length (sec)<input type="number" id="peekDurationInput" class="textInput" min="1" max="10" step="0.5"></label>
+        </div>
+        <div class="row"><button id="resetTimingBtn" type="button" class="btn btnGhost">Reset to defaults</button></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Hints &amp; reveals</h4>
+        <p class="sectionNote">Host-only tools. Nobody earns points from them.</p>
+        <div class="row">
+          <button id="peekBtn" class="btn btnGhost" type="button">Peek at all cards</button>
+          <button id="revealPairBtn" class="btn btnGhost" type="button">Reveal 1 pair</button>
+        </div>
+        <div class="row">
+          <button id="revealThreeBtn" class="btn btnGhost" type="button">Reveal 3 pairs</button>
+        </div>
+        <button id="revealBoardBtn" class="btn btnDanger btnFull" type="button">Reveal whole board</button>
+      </div>
+
+      <button type="button" id="applyBtn" class="btn btnGold btnFull">💾 Save &amp; apply settings</button>
+      <div id="saveSettingsConfirm" class="save-settings-confirm" hidden></div>
+
+      <div class="drawerSection">
+        <h4>Saved defaults</h4>
+        <button type="button" id="saveDefaultSettingsBtn" class="btn btnGhost btnFull">🌟 Save &amp; apply as default</button>
+        <p class="sectionNote">Remembers Mode, Difficulty, Auto Next Game (and its delay), the timings, Auto-Play Bots and your TikTok username on this device, and re-applies them when this page loads after the game has restarted. <button type="button" id="clearDefaultSettingsBtn" class="linkBtn">Clear saved default</button></p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Activity &amp; diagnostics</h4>
+        <button id="detailsToggle" class="linkBtn" type="button">Show leaderboard &amp; activity</button>
+        <div id="detailsPanel" class="details-panel" hidden>
+          <div class="diagnostics-box">
+            <h3>Diagnostics</h3>
+            <div>Chat comments received: <span id="rawEventCount">0</span></div>
+            <div>Last received: <span id="lastReceived">(none yet)</span></div>
+          </div>
+          <div class="leaderboard-box"><h3>This round (1 pt / pair found)</h3><ol id="leaderboardList"></ol></div>
+          <div class="leaderboard-box"><h3>All-time leaderboard</h3><ol id="allTimeLeaderboardList"></ol></div>
+          <div class="feed-box"><h3>Recent guesses</h3><ul id="feedList"></ul></div>
+        </div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Scores</h4>
+        <p class="sectionNote">Clears a leaderboard for everyone. This cannot be undone.</p>
+        <button id="resetRoundBtn" type="button" class="btn btnDanger btnFull">Reset this round's leaderboard</button>
+        <button id="resetAllTimeBtn" type="button" class="btn btnDanger btnFull">Reset all-time leaderboard</button>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Live event tools</h4>
+        <div data-engagement-tools></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mode picker popup -->
+  <div class="pickerOverlay" id="modePickerOverlay" hidden>
+    <div class="pickerSheet">
+      <button class="pickerOption mode-btn" data-mode="live" type="button"><span class="pickerRadio"></span><span class="pickerTextWrap"><span class="pickerTitle">Live</span><span class="pickerDesc">Counts for the chat leaderboard</span></span></button>
+      <button class="pickerOption mode-btn" data-mode="test" type="button"><span class="pickerRadio"></span><span class="pickerTextWrap"><span class="pickerTitle">Test</span><span class="pickerDesc">Practice with fake chat</span></span></button>
+      <button class="pickerOption mode-btn" data-mode="offline" type="button"><span class="pickerRadio"></span><span class="pickerTextWrap"><span class="pickerTitle">Offline</span><span class="pickerDesc">Host plays solo or with teams</span></span></button>
+    </div>
+  </div>
+
+  <!-- How-to-play modal -->
+  <div class="modalOverlay" id="howToOverlay" hidden>
+    <div class="modal">
+      <div class="modalHead">
+        <h3>How to play</h3>
+        <button class="iconBtn" id="closeHowTo" type="button" aria-label="Close">✕</button>
+      </div>
+      <ul class="howToList">
+        <li>Type <strong>two card numbers</strong> in chat, e.g. <span class="mono highlight">1 5</span> (a comma works too: <span class="mono highlight">1, 5</span>).</li>
+        <li>Both cards flip over. If the pictures match, they stay open. If not, they flip back after a moment - <strong>remember where they were</strong>.</li>
+        <li>Each pair you find earns <strong>1 point</strong>. Match pairs <strong>back-to-back</strong> for a combo streak - each one in a row is worth more, up to +4 total. A wrong guess resets your streak.</li>
+        <li>Each picture is hidden on exactly two cards. The game is won when <strong>every pair</strong> has been found. There is no time limit.</li>
+        <li>👁️ <strong>Peek</strong> shows every card for a moment (host tool, no points).</li>
+        <li><strong>Live</strong> = real TikTok chat. <strong>Test</strong> = simulated chat. <strong>Offline</strong> = you (or teams) tap two cards or type their numbers.</li>
+      </ul>
+      <button class="btn btnGold" id="closeHowTo2" type="button">Got it</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/engagement.js"></script>
+  <script src="memory-symbols.js"></script>
+  <script src="memory-game.js"></script>
+</body>
+</html>

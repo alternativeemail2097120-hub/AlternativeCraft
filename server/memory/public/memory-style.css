@@ -1,0 +1,1796 @@
+/* MEMORY MATCH (update 146) - platform chrome (same as the other games) + the original board styles recoloured with the platform theme tokens. */
+/* ============================================================
+   NUMBERBLINDLE — design tokens
+   ============================================================ */
+/* Backgrounds/surfaces/borders/ink now follow the platform's shared
+   theme picker (/shared/theme.css, loaded before this file) instead of
+   being hardcoded, so choosing a theme anywhere on the platform recolors
+   NUMBERBLINDLE too. Gold/coral/success/violet stay as NUMBERBLINDLE's own fixed
+   accent identity, same as Flagle/TRAVLE keep their bold accent colors.
+   --panel and --panel-light are deliberately two DIFFERENT shades (a
+   light elevated card, then a visibly deeper nested-panel tone) so
+   panels-within-panels actually separate from each other instead of
+   blending into one flat color. --text is body-text ink; --muted is a
+   softer secondary tone that stays legible without competing with --text. */
+:root {
+  --bg-stage: var(--theme-bg, #0d0f1f);
+  --panel: var(--theme-card, #171b3d);
+  --panel-light: var(--theme-surface-2, #212656);
+  --gold: #ffb100;
+  --gold-dim: #d99400;
+  --gold-text: #8A5A00; /* readable-as-TEXT variant of --gold — bright gold used for text on a light bg fails contrast; use this for labels/badges, keep --gold for solid-fill backgrounds/icons/borders */
+  --coral: #ff3b4e;
+  --success: #16d976;
+  --success-text: #0F7A3D; /* readable-as-TEXT variant of --success — same reasoning as --gold-text */
+  --violet: #7c5cff;
+  --text: var(--theme-ink, #f6f4ef);
+  --muted: var(--theme-ink-soft, #9aa0c3);
+  --heading: var(--theme-deep, #f6f4ef);
+  --border: var(--theme-line, rgba(60, 40, 20, 0.278));
+  --shadow: 0 14px 32px var(--theme-shadow, rgba(2, 3, 12, 0.35));
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-stage);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  height: calc(var(--vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -8%, rgba(255, 177, 0, 0.16), transparent 60%),
+    radial-gradient(ellipse 700px 400px at 100% 110%, rgba(255, 59, 78, 0.11), transparent 60%),
+    var(--bg-stage);
+}
+
+button, input, select { font-family: var(--font-body); color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Extra top padding reserves space for TikTok LIVE's own on-screen UI
+     (viewer name, live badge, gift/exit icons) so it never covers the
+     top bar — see --live-safe-top in /shared/theme.css. */
+  padding: calc(8px + var(--live-safe-top)) 10px 8px;
+  background: rgba(20, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  /* Single row, always - see .toolbarRow below for how every control in
+     it is sized to actually fit alongside the brand at ordinary 100%
+     zoom, with nothing wrapping, scrolling, or hidden off-screen. */
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.brandRow { display: flex; align-items: center; gap: 6px; min-width: 0; flex-shrink: 1; }
+.brandDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(60, 40, 20, 0.163);
+}
+.brandDot.live { background: var(--success); box-shadow: 0 0 0 3px rgba(22, 217, 118, 0.18); }
+.brandDot.test_mode { background: var(--violet); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18); }
+.brandDot.connecting, .brandDot.retrying { background: var(--gold); animation: pulse 1.1s ease-in-out infinite; }
+.brandDot.error { background: var(--coral); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.brandTitle {
+  font-family: var(--font-display); font-weight: 700; font-size: 15px; line-height: 1.1; color: var(--heading);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brandTitle .accent { color: var(--gold-text); text-shadow: 0 0 18px rgba(255, 177, 0, 0.45); }
+/* The tagline is dropped from the compact single-row header (see
+   .toolbarRow below) so the row has room for every button - it isn't
+   needed to understand or play the game. Markup is left in place rather
+   than deleted in case a future wider layout wants it back. */
+.brandSubtitle { display: none; }
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+/* Everything in the toolbar (icons + the two badges) is sized down
+   specifically HERE, scoped to .toolbarRow only, so nothing elsewhere
+   in the app (drawer close buttons, celebration close button, etc.)
+   is affected - only this one row needs to be this compact to fit
+   home + hint + help + leaderboard + settings + fullscreen, the mode
+   badge, and the length badge on a single line without wrapping,
+   scrolling, or relying on the browser being zoomed out. */
+.toolbarRow .modeBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(124, 92, 255, 0.16);
+  color: var(--violet);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.toolbarRow .modeBadge.live { background: rgba(22, 217, 118, 0.16); color: var(--success-text); }
+.toolbarRow .modeBadge.offline { background: rgba(60, 40, 20, 0.255); color: var(--muted); }
+
+.toolbarRow .lengthBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(60, 40, 20, 0.186);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbarRow .iconBtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(60, 40, 20, 0.117);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.iconBtn:active { transform: scale(0.94); }
+.iconBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+.iconBtn.active { background: rgba(255, 177, 0, 0.18); border-color: rgba(255, 177, 0, 0.4); color: var(--gold-text); }
+.iconBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--gold);
+  color: #241a05;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+}
+.iconBadge.hidden { display: none; }
+
+.toastSlot {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  height: var(--toast-slot-height, 76px);
+  pointer-events: none;
+}
+/* ============================================================
+   Host controls (sticky bottom)
+   ============================================================ */
+.controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  background: rgba(20, 23, 42, 0.97);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -14px 32px rgba(4, 5, 14, 0.5);
+}
+.controlsHandle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px;
+}
+.handleArrow { transition: transform 0.2s ease; }
+.controlsHandle[aria-expanded="false"] .handleArrow { transform: rotate(-90deg); }
+.controlsBody { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin: 0 auto; }
+.controlsBody.collapsed { display: none; }
+.modeControls[hidden] { display: none; }
+.row { display: flex; gap: 8px; align-items: center; }
+.textInput, .selectInput {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+.selectNarrow { flex: 0 0 84px; }
+.textInput::placeholder { color: var(--muted); }
+.btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btnPrimary { background: var(--coral); color: #260f0c; }
+.btnGold { background: var(--gold); color: #241a05; }
+.btnGhost { background: rgba(60, 40, 20, 0.186); color: var(--text); border: 1px solid var(--border); }
+.btnDanger { background: rgba(255, 59, 78, 0.14); color: #7A1620; border: 1px solid rgba(255, 59, 78, 0.4); margin-bottom: 8px; }
+.btnFull { width: 100%; }
+.miniStatus { margin: 0; font-size: 12px; color: var(--muted); min-height: 16px; }
+
+/* ============================================================
+   Drawers (Settings / Leaderboard) — slide in from the right
+   ============================================================ */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.6);
+  backdrop-filter: blur(3px);
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+.drawerOverlay[hidden] { display: none; }
+.drawer {
+  width: 100%;
+  max-width: 400px;
+  height: 100%;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 18px 18px 32px;
+  overflow-y: auto;
+  animation: drawer-in 0.22s ease;
+}
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0.5; } to { transform: translateX(0); opacity: 1; } }
+.drawerHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.drawerHead h3 { margin: 0; font-family: var(--font-display); font-size: 19px; color: var(--heading); }
+
+.statusChips { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.statusChip {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.statusChip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.statusChip.good .dot { background: var(--success); }
+.statusChip.bad .dot { background: var(--coral); }
+.statusChip.warn .dot { background: var(--gold); }
+
+.drawerSection { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.drawerSection:last-child { border-bottom: none; }
+.drawerSection h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sectionNote { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.fieldLabel { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+.delayLabel { flex: 1; margin-bottom: 0; }
+
+.pickerRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.chev { color: var(--muted); }
+
+.linkBtn { background: none; border: none; color: var(--muted); font-size: 11px; text-transform: none; letter-spacing: 0; cursor: pointer; padding: 2px 4px; }
+
+.diagGrid { display: grid; grid-template-columns: 1fr; gap: 8px; font-size: 12.5px; }
+.diagRow { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.diagRow:last-child { border-bottom: none; }
+.diagKey { color: var(--muted); }
+.diagVal { font-weight: 600; text-align: right; }
+.diagVal.warn { color: var(--gold-text); }
+.diagVal.bad { color: #C81E36; font-weight: 700; }
+.diagVal.good { color: var(--success-text); }
+
+.switchRow { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.switchRow input { position: absolute; opacity: 0; width: 0; height: 0; }
+.switchTrack { width: 38px; height: 22px; border-radius: 999px; background: rgba(60, 40, 20, 0.301); position: relative; flex-shrink: 0; transition: background 0.2s ease; }
+.switchThumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--text); transition: transform 0.2s ease; }
+.switchRow input:checked + .switchTrack { background: var(--gold); }
+.switchRow input:checked + .switchTrack .switchThumb { transform: translateX(16px); background: #241a05; }
+.switchLabel { flex: 1; }
+
+/* ---- Mode picker popup ---- */
+.pickerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.6);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.pickerOverlay[hidden] { display: none; }
+.pickerSheet {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.pickerOption {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  text-align: left;
+  color: var(--text);
+}
+.pickerOption:last-child { border-bottom: none; }
+.pickerRadio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  flex-shrink: 0;
+  position: relative;
+}
+.pickerOption.selected .pickerRadio { border-color: var(--gold); }
+.pickerOption.selected .pickerRadio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.pickerTextWrap { display: flex; flex-direction: column; gap: 2px; }
+.pickerTitle { font-weight: 700; font-size: 14px; }
+.pickerDesc { font-size: 12px; color: var(--muted); }
+
+/* ---- Leaderboard tabs ---- */
+.tabRow { display: flex; gap: 8px; margin-bottom: 14px; }
+.tabBtn {
+  flex: 1;
+  background: rgba(60, 40, 20, 0.117);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tabBtn.active { background: var(--gold); color: #241a05; border-color: transparent; }
+
+.leaderboard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.leaderboard li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); background: rgba(60, 40, 20, 0.094); font-size: 14px; }
+.leaderboard li.empty { color: var(--muted); justify-content: center; background: none; text-align: center; }
+.leaderboard .rank { font-family: var(--font-display); font-weight: 700; color: var(--gold-dim); width: 20px; flex-shrink: 0; }
+.leaderboard li:nth-child(1) .rank { color: var(--gold-text); }
+.leaderboard .lbName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard .lbScore { font-weight: 700; }
+
+/* ============================================================
+   How-to-play modal
+   ============================================================ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 7, 16, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 80;
+}
+.modalOverlay[hidden] { display: none; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+@media (min-width: 560px) {
+  .modalOverlay { align-items: center; }
+  .modal { border-radius: 20px; }
+}
+.modalHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.modalHead h3 { margin: 0; font-family: var(--font-display); font-size: 18px; color: var(--heading); }
+.howToList { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: var(--muted); }
+.howToList li strong { color: var(--text); }
+.legendTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 12px;
+  margin-right: 4px;
+}
+.legendTile.correct { background: var(--success); color: #08301a; }
+.legendTile.present { background: var(--gold); color: #2c1f04; }
+.legendTile.absent { background: rgba(255, 59, 78, 0.28); color: #7A1620; }
+
+@media (min-width: 720px) {
+  .stage { padding: 22px 16px 30px; }
+  .tile { width: 44px; height: 50px; font-size: 22px; }
+}
+
+/* Extra safety margin on genuinely tiny screens (very old/small phones)
+   so the toolbar row still fits without wrapping or scrolling. */
+@media (max-width: 340px) {
+  .topbar { padding: 6px 8px; gap: 4px; }
+  .toolbarRow { gap: 2px; }
+  .toolbarRow .iconBtn { width: 23px; height: 23px; font-size: 11px; border-radius: 7px; }
+  .toolbarRow .modeBadge, .toolbarRow .lengthBadge { font-size: 8px; padding: 2px 5px; }
+  .brandTitle { font-size: 13px; }
+  .brandDot { width: 7px; height: 7px; }
+}
+
+/* ============================================================
+   Win celebration confetti
+   ============================================================ */
+.confettiLayer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  overflow: hidden;
+}
+.confettiPiece {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(540deg); opacity: 0.3; }
+}
+
+/* ============================================================
+   Win celebration: sequence of centered floating windows
+   ============================================================ */
+.celebrationOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 5, 14, 0.72);
+  backdrop-filter: blur(4px);
+}
+.celebrationOverlay[hidden] { display: none; }
+
+.celebrationCard {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: linear-gradient(180deg, var(--panel-light), var(--panel));
+  border: 1px solid rgba(255, 177, 0, 0.4);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px rgba(255, 177, 0, 0.08), 0 30px 60px rgba(2, 3, 12, 0.7);
+  padding: 30px 22px 20px;
+  text-align: center;
+  animation: celeb-pop 0.32s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+@keyframes celeb-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrationClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.celebrationBody { min-height: 140px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+
+.celebLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+.celebWinnerRow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text);
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.celebAnswerRow {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: 0.03em;
+  color: var(--success-text);
+  text-shadow: 0 0 22px rgba(22, 217, 118, 0.4);
+  word-break: break-word;
+  margin-top: 2px;
+}
+.celebPoints { font-size: 13px; color: var(--gold-dim); font-weight: 600; }
+
+.celebBoardTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.celebBoardList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.celebBoardList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(60, 40, 20, 0.117);
+  font-size: 14px;
+}
+.celebBoardList li.empty { color: var(--muted); justify-content: center; text-align: center; }
+.celebBoardList .rank { font-family: var(--font-display); font-weight: 700; color: var(--gold-dim); width: 20px; flex-shrink: 0; }
+.celebBoardList li:nth-child(1) .rank { color: var(--gold-text); }
+.celebBoardList .lbName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.celebBoardList .lbScore { font-weight: 700; }
+
+.celebrationDots { display: flex; justify-content: center; gap: 6px; margin-top: 18px; }
+.celebDot { width: 6px; height: 6px; border-radius: 50%; background: rgba(60, 40, 20, 0.42); }
+.celebDot.active { background: var(--gold); }
+
+/* ===== MEMORY board (from the original game) ===== */
+:root {
+  --bg: var(--theme-bg, #F5E3C0);
+  --bg-panel: var(--theme-surface-2, #F2E4C8);
+  --bg-input: var(--theme-card, #FFFBF2);
+  --pink: var(--hero-accent, #7B5EA7);
+  --cyan: var(--theme-deep, #6B4423);
+  --text-dim: var(--theme-ink-soft, #8A7864);
+  --given: var(--theme-surface-2, #F2E4C8);
+  --correct: #2f9e6b;
+  --success: #16803d;
+  --danger: #d33a3a;
+  --warning: #b45309;
+  --legend-bg: rgba(0, 0, 0, .05);
+  --host-console-offset: 0px;
+}
+/* ---- Top toolbar custom dropdowns (difficulty / theme) -----------------
+   Not native <select> elements: a compact icon-sized trigger button shows
+   only a single symbol for the current choice (a colored, numbered badge
+   for difficulty; a two-tone color swatch for theme), so it can never get
+   cut off on a narrow phone. The full list of names only appears in the
+   floating menu once the trigger is tapped. */
+.toolbar-dropdown { position: relative; flex: 0 0 auto; }
+.toolbar-dropdown-trigger { display: flex; align-items: center; justify-content: center; padding: 0; }
+.toolbar-dropdown-menu {
+  position: fixed;
+  z-index: 90;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  min-width: 176px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+}
+.toolbar-dropdown-menu[hidden] { display: none; }
+.toolbar-dropdown-menu li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+.toolbar-dropdown-menu li:hover { background: var(--bg-input); }
+.toolbar-dropdown-menu li.dd-active { background: var(--legend-bg); font-weight: 700; }
+.toolbar-dropdown-menu .dd-label { flex: 1; white-space: nowrap; }
+
+/* Difficulty symbol: a small colored, numbered badge. Color runs green to
+   red as the level rises, so the level reads at a glance even at icon
+   size, with the number giving an unambiguous 1-7 scale. */
+.diff-badge {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.diff-badge.level-1 { background: #16a34a; }
+.diff-badge.level-2 { background: #65a30d; }
+.diff-badge.level-3 { background: #ca8a04; }
+.diff-badge.level-4 { background: #ea580c; }
+.diff-badge.level-5 { background: #dc2626; }
+.diff-badge.level-6 { background: #b91c1c; }
+.diff-badge.level-7 { background: #7f1d1d; }
+.toolbar-dropdown-trigger .diff-badge { width: 18px; height: 18px; font-size: 10px; }
+
+/* Theme symbol: a two-tone circular swatch built from that theme's own
+   background and accent colors, so each theme is recognizable on sight. */
+.theme-swatch {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.toolbar-dropdown-trigger .theme-swatch { width: 18px; height: 18px; }
+.swatch-dark     { background: linear-gradient(135deg, #161a23 50%, #ec5f74 50%); }
+.swatch-light    { background: linear-gradient(135deg, #f4f5f9 50%, #d63a56 50%); }
+.swatch-cream    { background: linear-gradient(135deg, #faf3e4 50%, #c1512b 50%); }
+.swatch-sky      { background: linear-gradient(135deg, #eef6fc 50%, #1670a3 50%); }
+.swatch-meadow   { background: linear-gradient(135deg, #eef7ee 50%, #2f7d4f 50%); }
+.swatch-blossom  { background: linear-gradient(135deg, #fdf1f5 50%, #c23368 50%); }
+.swatch-lavender { background: linear-gradient(135deg, #f4f1fb 50%, #5b3ea6 50%); }
+.swatch-honey    { background: linear-gradient(135deg, #fdf6e6 50%, #9c6b0a 50%); }
+
+@media (max-width: 480px) {
+  .toolbar-dropdown-menu { min-width: 156px; font-size: 12px; }
+}
+
+.quick-hint {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- Compact top toolbar on narrow phones ---------------------------
+   Every button (difficulty, new puzzle, leaderboard, the 3 reveal
+   buttons, full screen, settings) plus the title must stay on one row,
+   in normal view and in Full Screen, on typical Android widths too.
+   Shrink everything progressively rather than letting it wrap. */
+@media (max-width: 480px) {
+  .top-bar { padding: 8px 10px; gap: 6px; }
+  .top-bar h1 { font-size: 14px; }
+  .top-bar-actions { gap: 4px; }
+  .icon-btn { width: 28px; height: 28px; font-size: 13px; border-radius: 7px; }
+}
+@media (max-width: 380px) {
+  .top-bar h1 { font-size: 13.5px; }
+  .top-bar { padding: 8px 8px; gap: 5px; }
+  .top-bar-actions { gap: 3px; }
+  .icon-btn { width: 26px; height: 26px; font-size: 12px; }
+}
+.mono { font-family: "Courier New", monospace; }
+.highlight { color: var(--cyan); font-weight: bold; }
+.board-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 10px 4px 10px;
+}
+.puzzle-topline {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.stopwatch {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.auto-next-countdown {
+  width: 100%;
+  max-width: 520px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--cyan);
+  margin: -4px 0 8px 0;
+}
+.live-status-mini { font-size: 12px; font-weight: 600; }
+.live-status-mini.status-idle, .live-status-mini.status-disconnected { color: var(--text-dim); }
+.live-status-mini.status-connecting, .live-status-mini.status-retrying { color: var(--warning); }
+.live-status-mini.status-connected { color: var(--success); }
+.live-status-mini.status-error { color: var(--danger); }
+.solved-banner {
+  background: var(--correct);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.details-toggle {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 520px;
+  background: transparent;
+  color: var(--cyan);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.details-panel {
+  width: 100%;
+  max-width: 520px;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.details-panel:not([hidden]) { display: flex; }
+.diagnostics-box, .leaderboard-box, .feed-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.diagnostics-box h3, .leaderboard-box h3, .feed-box h3 { margin: 0 0 6px 0; font-size: 14px; color: var(--cyan); }
+/* This round's leaderboard shows every scorer, however many there are. */
+#leaderboardList { margin: 0; padding-left: 0; list-style: none; }
+#leaderboardList li { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+/* All-time leaderboard: everyone who has ever scored is in the list, but
+   only about 20 rows are visible at once - scroll for the rest. */
+#allTimeLeaderboardList {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  max-height: 680px;
+  overflow-y: auto;
+}
+#allTimeLeaderboardList li { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+#feedList { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+#feedList li { padding: 3px 0; border-bottom: 1px solid var(--border); }
+.feed-correct { color: var(--success); }
+.feed-wrong { color: var(--danger); }
+.feed-info { color: var(--text-dim); }
+
+/* ---- Host console bar (collapsible) ---------------------------------
+   The host console can be collapsed down to a slim strip to free up
+   screen space (handy on a phone, or once the host is done typing
+   answers manually). Its expanded/collapsed state is remembered on this
+   device. */
+.host-console-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 14px 10px 14px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+}
+.host-console-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+.host-console-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.host-console-toggle {
+  background: transparent;
+  border: none;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.host-console-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.host-console-bar.collapsed { display: none; }
+.host-console-bar input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Small floating button shown only while the Host Console is hidden, so
+   collapsing it reclaims the full-width bar instead of leaving a strip
+   behind. */
+.host-console-show-btn {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 30;
+  background: var(--bg-panel);
+  color: var(--cyan);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 9px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
+.host-console-show-btn[hidden] { display: none; }
+.btn {
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-primary { background: var(--pink); color: #fff; }
+.btn-secondary { background: var(--cyan); color: #06201f; }
+.btn-danger { background: var(--danger); color: #2b0b0b; }
+
+/* ---- Card Symbols picker (Settings drawer) -------------------------------
+   Same card-grid look as the theme picker above, but the buttons are built
+   at runtime from whatever pack list the server sends (see client.js). */
+.emoji-pack-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.emoji-pack-row .hint { margin: 0 0 2px 0; }
+.emoji-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.emoji-pack-btn {
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.emoji-pack-btn.active {
+  border-color: var(--pink);
+  background: var(--legend-bg);
+  box-shadow: inset 0 0 0 1px var(--pink);
+  color: var(--pink);
+}
+@media (max-width: 380px) {
+  .emoji-pack-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Combo / streak badge -------------------------------------------------
+   Small flame + count shown next to a viewer's name once they're 2+ pairs
+   into a streak: in the floating guess pill and in the This Round list. */
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ff9a3c, #ff5f6d);
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ---- Circular avatars (real TikTok photo, or generated initials) ---- */
+.avatar-circle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--given);
+  border: 1px solid var(--border);
+}
+.avatar-circle.lg { width: 40px; height: 40px; }
+.avatar-circle.sm { width: 16px; height: 16px; border-width: 1px; }
+
+/* ---- Live guess toast area --------------------------------------------
+   Sits in the gap between the "Chat format" hint and the status/timer
+   row. This box has a fixed, reserved height at all times (whether or
+   not a toast is currently showing) so the board never gets pushed
+   up/down as toasts appear and disappear. Only one toast is shown at a
+   time - a new incoming guess immediately replaces whatever is current,
+   instead of stacking multiple pills. The toast itself is positioned
+   absolutely inside the reserved box so its enter/exit animation never
+   changes the box's height. */
+.live-guess-toast-area {
+  width: 100%;
+  max-width: 520px;
+  position: relative;
+  height: 40px;
+  margin-bottom: 6px;
+}
+.guess-toast {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: guessToastIn 0.25s ease forwards;
+}
+.guess-toast.leaving {
+  animation: guessToastOut 0.35s ease forwards;
+}
+@keyframes guessToastIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes guessToastOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+.guess-toast .guess-name { font-weight: 700; }
+.guess-toast .guess-detail { color: var(--text-dim); }
+.guess-toast.toast-correct { border-color: var(--correct); }
+.guess-toast.toast-correct .guess-points { color: var(--success); font-weight: 700; margin-left: auto; }
+.guess-toast.toast-wrong { border-color: var(--danger); }
+.guess-toast.toast-wrong .guess-detail { color: var(--danger); }
+.guess-toast.toast-info { border-color: var(--warning); }
+.guess-toast.toast-info .guess-detail { color: var(--warning); }
+.guess-toast.toast-format { opacity: 0.85; }
+.guess-toast.toast-format .guess-detail { color: var(--text-dim); font-style: italic; }
+
+/* ---- Round-end floating windows (round top scorers, then all-time) --- */
+.round-end-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  padding: 20px;
+}
+.round-end-overlay[hidden] { display: none; }
+.round-end-card {
+  width: 100%;
+  max-width: 360px;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+  animation: roundEndPop 0.2s ease;
+}
+@keyframes roundEndPop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.round-end-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.round-end-head h2 { margin: 0; font-size: 16px; color: var(--cyan); }
+.round-end-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+/* All-time slide of the round-end popup: show roughly the top 20 at a
+   glance, scroll within the list itself for the rest. */
+.round-end-list.capped-20 { max-height: 60vh; overflow-y: auto; }
+.round-end-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--bg-input);
+}
+.round-end-rank {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+/* Gold/silver/bronze medals for 1st/2nd/3rd place get a bigger emoji. */
+.round-end-rank-medal { font-size: 18px; }
+.round-end-name { flex: 1; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.round-end-points { flex: 0 0 auto; font-weight: 700; color: var(--success); font-size: 13.5px; }
+.round-end-countdown {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--cyan);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* Inline rank/medal badge used in the small in-page leaderboard lists. */
+.inline-rank {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.inline-rank-medal { font-size: 14px; }
+
+/* ---- Leaderboard floating window (top-toolbar trophy button) --------- */
+.leaderboard-modal-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.lb-modal-tab {
+  flex: 1;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  padding: 7px 6px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.lb-modal-tab.active { background: var(--pink); color: #fff; border-color: var(--pink); font-weight: 700; }
+
+/* =====================================================================
+   MEMORY MATCH — board, cards and the few bits that are new to this game.
+   Everything above is the shared look (themes, toolbar, drawer, lists).
+   ===================================================================== */
+:root { --grid-max: 520px; --card-font-size: 16px; }
+
+.memory-grid {
+  --cols: 6;
+  --rows: 6;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  gap: 5px;
+  padding: 5px;
+  /* Never wider than the screen, never taller than what is left under the
+     toolbar, so tall boards (Chaos) still fit on a phone without scrolling. */
+  width: min(100%, var(--grid-max), max(200px, calc((var(--vh) * 100 - 390px) * var(--cols) / var(--rows))));
+  aspect-ratio: var(--cols) / var(--rows);
+  background: var(--bg-input);
+  border: 2px solid var(--cyan);
+  border-radius: 14px;
+}
+
+/* ---- Part 7: puffy sticker tiles -----------------------------------------
+   A fresh middle ground between the earlier glossy "candy button" look
+   (part 4, felt busy) and the flat two-tone look (part 6, felt dull): each
+   tile is a soft puffy gradient "jelly bubble" with a bright die-cut sticker
+   rim, like a cute vinyl sticker rather than a printed square. Variety comes
+   from a gentle two-tone alternation (pink-leaning / cyan-leaning, as
+   before) plus one small star peeking from a corner - one whimsical touch
+   per tile, not a pattern, so the board stays calm at a glance. Symbols get
+   a playful pop-and-wiggle when they flip in, and a match adds a quick
+   sparkle burst instead of a static glow. Every color is derived from the
+   active theme's own variables with color-mix(), so it re-tints itself for
+   all 8 themes and light/dark mode automatically. */
+:root {
+  --tile-radius: 16px;
+  --tile-a-hi: color-mix(in srgb, var(--pink) 58%, white 42%);
+  --tile-a-lo: color-mix(in srgb, var(--pink) 40%, var(--bg-panel) 60%);
+  --tile-b-hi: color-mix(in srgb, var(--cyan) 58%, white 42%);
+  --tile-b-lo: color-mix(in srgb, var(--cyan) 40%, var(--bg-panel) 60%);
+  --tile-rim: color-mix(in srgb, white 60%, var(--bg-panel) 40%);
+  --tile-front: color-mix(in srgb, var(--bg-panel) 97%, white 3%);
+  --tile-match-hi: color-mix(in srgb, var(--correct) 55%, white 45%);
+  --tile-match-lo: color-mix(in srgb, var(--correct) 30%, var(--bg-panel) 70%);
+}
+
+.card {
+  position: relative;
+  perspective: 700px;
+  min-width: 0;
+  min-height: 0;
+}
+.card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.card.flipped .card-inner,
+.card.matched .card-inner { transform: rotateY(180deg); }
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--tile-radius);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  font-weight: 800;
+  user-select: none;
+}
+.card-back {
+  background: radial-gradient(circle at 32% 26%, var(--tile-a-hi), var(--tile-a-lo) 72%);
+  border: 2px solid var(--tile-rim);
+  color: var(--text);
+  font-size: var(--card-font-size);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.18);
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.14),
+    0 4px 9px rgba(0,0,0,0.18),
+    inset 0 1px 1px rgba(255,255,255,0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+/* One small star sticker peeking from a corner - a single whimsical touch
+   per tile rather than a repeating pattern, so it reads as cute, not busy. */
+.card-back::after {
+  content: '\2726';
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.65);
+  pointer-events: none;
+}
+/* Alternate the two pastel tones by grid position - a quiet checkerboard
+   instead of one flat color, without going full rainbow. */
+.memory-grid > .card:nth-child(even) .card-back {
+  background: radial-gradient(circle at 32% 26%, var(--tile-b-hi), var(--tile-b-lo) 72%);
+}
+.card-front {
+  background: var(--tile-front);
+  border: 2px solid var(--tile-rim);
+  transform: rotateY(180deg);
+  font-size: calc(var(--card-font-size) * 1.5);
+  line-height: 1;
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.10),
+    0 5px 11px rgba(0,0,0,0.16),
+    inset 0 1px 1px rgba(255,255,255,0.6);
+  /* The emoji itself gets a soft drop-shadow so it sits gently above the
+     tile rather than printed flat on it. */
+  filter: drop-shadow(0 2px 1px rgba(0,0,0,0.15));
+}
+/* A playful pop-and-wiggle as a face-up tile settles into place, on top of
+   the 3D flip - more "alive" than a plain bounce, still a one-shot so the
+   board never feels restless once it's settled. */
+.card.flipped .card-front,
+.card.matched .card-front {
+  animation: tileSettleWiggle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes tileSettleWiggle {
+  0%   { transform: rotateY(180deg) scale(0.72) rotate(-8deg); }
+  55%  { transform: rotateY(180deg) scale(1.1) rotate(5deg); }
+  80%  { transform: rotateY(180deg) scale(0.97) rotate(-2deg); }
+  100% { transform: rotateY(180deg) scale(1) rotate(0deg); }
+}
+/* Matched: a bright puffy green gradient and a quick sparkle burst from
+   opposite corners, in place of a static glow - a small celebration that
+   settles rather than a permanent glow every matched tile keeps emitting. */
+.card.matched .card-front {
+  background: radial-gradient(circle at 32% 26%, var(--tile-match-hi), var(--tile-match-lo) 72%);
+  border-color: var(--correct);
+  animation: matchPuffPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes matchPuffPop {
+  0%   { scale: 1; }
+  45%  { scale: 1.15; }
+  100% { scale: 1; }
+}
+.card.matched .card-front::before,
+.card.matched .card-front::after {
+  content: '\2728';
+  position: absolute;
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+}
+.card.matched .card-front::before {
+  top: -3px;
+  left: -3px;
+  animation: sparkleBurstA 0.6s ease-out 0.05s;
+}
+.card.matched .card-front::after {
+  bottom: -3px;
+  right: -3px;
+  animation: sparkleBurstB 0.6s ease-out 0.12s;
+}
+@keyframes sparkleBurstA {
+  0%   { opacity: 0; transform: scale(0.4) translate(0, 0); }
+  40%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.3) translate(-6px, -6px); }
+}
+@keyframes sparkleBurstB {
+  0%   { opacity: 0; transform: scale(0.4) translate(0, 0); }
+  40%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.3) translate(6px, 6px); }
+}
+/* Host-facing hover/press: a small, quiet lift/press rather than a big
+   skeuomorphic squish. Harmless on touch devices (no hover state fires). */
+.memory-grid:not(.locked) .card:not(.flipped):not(.matched):hover .card-back {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.14), 0 6px 12px rgba(0,0,0,0.22), inset 0 1px 1px rgba(255,255,255,0.5);
+}
+.memory-grid:not(.locked) .card:not(.flipped):not(.matched):active .card-back {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.14), 0 2px 5px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.5);
+}
+/* A wrong pair stays face-up for a moment: rather than a bold red ring,
+   just a quick, quiet shake so it reads as "not that one" without
+   shouting about it. */
+.memory-grid.locked .card.flipped:not(.matched) .card-inner {
+  animation: wrongShake 0.35s ease;
+}
+@keyframes wrongShake {
+  0%, 100% { transform: rotateY(180deg) translateX(0); }
+  25%      { transform: rotateY(180deg) translateX(-3px); }
+  75%      { transform: rotateY(180deg) translateX(3px); }
+}
+
+.pairs-counter {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Leaderboard rows (details panel + trophy window). */
+.lb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.lb-points { flex: 0 0 auto; font-weight: 700; color: var(--success); }
+.lb-empty { color: var(--text-dim); font-style: italic; }
+
+/* Recent answers feed. Each row shows the exact viewer photo (circular,
+   same source as the leaderboards and the guess toast) next to their name. */
+#feedList li { font-size: 12.5px; line-height: 1.4; }
+#feedList li.feed-row { display: flex; align-items: center; gap: 6px; }
+#feedList .feed-row .avatar-circle { margin-top: 1px; }
+#feedList .feed-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#feedList .feed-user { font-weight: 700; color: var(--text); }
+
+/* Round-end popup extras. */
+.round-end-summary {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+}
+.round-end-actions { display: flex; gap: 8px; margin-top: 12px; }
+.round-end-actions .btn { flex: 1; }
+
+/* Difficulty menu: card count sits quietly after the level name. */
+.dd-label small { color: var(--text-dim); font-size: 11.5px; margin-left: 4px; }
+
+/* Full screen on big displays: allow a larger board, still centered. */
+@media (min-width: 900px) {
+  .app:fullscreen,
+  .app:-webkit-full-screen { --grid-max: 680px; }
+  .app:fullscreen .puzzle-topline,
+  .app:-webkit-full-screen .puzzle-topline,
+  .app:fullscreen .details-panel,
+  .app:-webkit-full-screen .details-panel { max-width: 680px; }
+}
+
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-inner { transition-duration: 0.01s; }
+  .card.matched .card-front,
+  .card.flipped .card-front { animation: none; }
+  .card.matched .card-front::before,
+  .card.matched .card-front::after { animation: none; opacity: 0; }
+  .memory-grid.locked .card.flipped:not(.matched) .card-inner { animation: none; }
+  .guess-toast, .round-end-card { animation: none; }
+}
+
+/* Test panel's bot switch sits last in its panel, so it needs no bottom gap. */
+.bot-auto-solve-toggle { margin-bottom: 0; }
+.round-end-countdown[hidden] { display: none; }
+
+/* ---- Timing settings box ------------------------------------------------ */
+.timing-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.timing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  margin-top: 4px;
+}
+.timing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.timing-field input {
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+}
+.timing-reset-btn { margin-top: 10px; width: 100%; }
+
+/* ---- Hints & Reveals box ------------------------------------------------ */
+.hints-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.hints-title { margin: 0 0 4px 0; font-size: 14px; color: var(--cyan); }
+.hints-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.hints-buttons .btn { flex: 1 1 auto; }
+
+/* Host notices (peek / reveal) reuse the guess pop-up pill without a photo. */
+.guess-toast.toast-notice { border-color: var(--cyan); }
+.guess-toast.toast-notice .guess-name { color: var(--cyan); }
+
+/* While the Peek hint is on, hidden cards show their picture. */
+.memory-grid.peeking .card:not(.matched) { outline: 2px solid var(--cyan); outline-offset: -2px; border-radius: var(--tile-radius); }
+
+
+/* =====================================================================
+   PART 8 - one uniform "pearl candy" tile, with gentle life in it.
+   Every tile is identical (no more two-tone halves): a soft pink-to-sky
+   pearl gradient, a glossy highlight, a slow shimmer sweep, a twinkling
+   star, and a tiny idle float. All colours come from the active theme.
+   ===================================================================== */
+:root {
+  --tile-radius: 20%;
+  --pearl-1: color-mix(in srgb, var(--pink) 46%, white 54%);
+  --pearl-2: color-mix(in srgb, var(--pink) 22%, var(--cyan) 30%);
+  --pearl-3: color-mix(in srgb, var(--cyan) 50%, white 50%);
+}
+.memory-grid { gap: 6px; padding: 6px; }
+.card-back,
+.memory-grid > .card:nth-child(even) .card-back {
+  background: linear-gradient(150deg, var(--pearl-1) 0%, var(--pearl-2) 55%, var(--pearl-3) 100%);
+  border: 2.5px solid rgba(255,255,255,0.85);
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(60,20,90,0.55), 0 0 6px rgba(255,255,255,0.35);
+  overflow: hidden;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.16), 0 6px 12px rgba(0,0,0,0.22),
+    inset 0 -6px 10px rgba(255,255,255,0.22), inset 0 3px 5px rgba(255,255,255,0.65);
+}
+/* glossy highlight + moving shimmer */
+.card-back::before {
+  content: '';
+  position: absolute;
+  top: -20%; left: -70%;
+  width: 45%; height: 140%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
+  transform: skewX(-18deg);
+  animation: tileShimmer 6.5s ease-in-out infinite;
+  pointer-events: none;
+}
+/* twinkling star sticker, same corner on every tile */
+.card-back::after {
+  content: '\2726';
+  top: 4px; right: 7px;
+  font-size: max(8px, calc(var(--card-font-size) * 0.5));
+  color: #fff;
+  animation: tileTwinkle 3.2s ease-in-out infinite;
+}
+@keyframes tileShimmer { 0%, 55% { left: -70%; } 85%, 100% { left: 140%; } }
+@keyframes tileTwinkle { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2) rotate(20deg); } }
+/* idle float, staggered so the board ripples instead of marching in step */
+.card:not(.flipped):not(.matched) .card-back { animation: tileFloat 4s ease-in-out infinite; }
+@keyframes tileFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -2px; } }
+.card:nth-child(3n) .card-back { animation-delay: -1.3s; }
+.card:nth-child(3n+1) .card-back { animation-delay: -2.6s; }
+.card:nth-child(4n) .card-back::before { animation-delay: -1.5s; }
+.card:nth-child(4n+1) .card-back::before { animation-delay: -3s; }
+.card:nth-child(4n+2) .card-back::before { animation-delay: -4.5s; }
+.card:nth-child(5n) .card-back::after { animation-delay: -1.1s; }
+.card:nth-child(5n+2) .card-back::after { animation-delay: -2.2s; }
+.card:nth-child(7n) .card-back::after { animation-delay: -0.6s; }
+/* face-up: light pearl so the pictures pop */
+.card-front {
+  background: radial-gradient(circle at 35% 25%, #fff, color-mix(in srgb, white 78%, var(--pink) 22%) 75%);
+  border: 2.5px solid rgba(255,255,255,0.9);
+  color: #333;
+}
+.card-front img {
+  width: 76%; height: 76%;
+  object-fit: contain;
+  pointer-events: none;
+  animation: symBreathe 2.6s ease-in-out 0.5s infinite;
+}
+@keyframes symBreathe { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
+.card.matched .card-front {
+  background: radial-gradient(circle at 35% 25%, #fff, var(--tile-match-hi) 70%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-back::before, .card-back::after, .card-front img,
+  .card:not(.flipped):not(.matched) .card-back { animation: none !important; }
+}
+
+/* ---- Always-on scoreboard (normal view and full screen) ---- */
+.live-scoreboard { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: min(100%, var(--grid-max)); margin-top: 8px; }
+.app:fullscreen .live-scoreboard, .app:-webkit-full-screen .live-scoreboard { width: min(100%, 680px); }
+.live-score-col { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 6px 8px; min-width: 0; }
+.live-score-col h3 { margin: 0 0 4px; font-size: 12px; color: var(--cyan); }
+.live-score-list { list-style: none; margin: 0; padding: 0; }
+.live-score-list li { display: flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 0; }
+.live-score-list .avatar-circle { width: 20px; height: 20px; }
+
+
+/* ---- Part 10: no glistening / flashing (light-sensitivity friendly) ----
+   No shimmer sweep, no twinkling star, no sparkle bursts. Tiles keep a
+   static soft highlight only. Only slow, gentle motion (float / breathe)
+   remains, with no brightness changes. */
+.card-back::before { display: none; animation: none; }
+.card-back::after { animation: none; opacity: 0.7; transform: none; }
+.card.matched .card-front::before,
+.card.matched .card-front::after { display: none; animation: none; }
+
+
+/* ---- Part 11: no idle motion at all ---- */
+.card:not(.flipped):not(.matched) .card-back,
+.card-front img { animation: none !important; }
+.lb-reset-btn { width: 100%; margin-bottom: 8px; }
+
+
+/* ---------------------------------------------------------------------------
+   Part 13: Multiplayer Teams (Offline Mode) + 8 new Card Symbol packs.
+   Team colors are fixed to four options (Red / Blue / Green / Yellow),
+   assigned randomly by the server - these classes just paint whichever
+   color a team/player/row was given.
+--------------------------------------------------------------------------- */
+.card-emo { display: inline-block; line-height: 1; }
+
+.teams-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.teams-box .hint { margin: 0 0 2px 0; }
+
+/* Teams vs Without Team (free-for-all) grouping picker */
+.grouping-tabs { display: flex; gap: 6px; }
+.grouping-btn {
+  flex: 1;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  padding: 7px 6px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.grouping-btn.active { background: var(--pink); color: #fff; border-color: var(--pink); }
+
+.team-name-inputs { display: flex; flex-direction: column; gap: 8px; }
+.solo-name-input { background: var(--bg-input); }
+.team-name-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+.team-name-group-label { font-size: 11.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.team-name-input {
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.team-roster { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.team-roster-card { border-radius: 8px; padding: 8px 10px; border-left: 5px solid; }
+.team-roster-title { font-weight: 700; font-size: 13px; }
+.team-roster-names { font-size: 12px; opacity: 0.85; }
+
+.team-player-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.team-player-chip {
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 2px solid transparent;
+  color: #fff;
+  opacity: 0.85;
+}
+.team-player-chip.active { opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,0.25); }
+
+/* Team color palette, applied to roster cards, chips and standings rows. */
+.team-color-red    { background: #e5484d; border-color: #b3262b; }
+.team-color-blue   { background: #3b82f6; border-color: #1d4ed8; }
+.team-color-green  { background: #22c55e; border-color: #15803d; }
+.team-color-yellow { background: #eab308; border-color: #a16207; color: #3a2c00; }
+.team-color-purple { background: #a855f7; border-color: #7e22ce; }
+.team-color-orange { background: #f97316; border-color: #c2410c; }
+.team-roster-card.team-color-red    { background: rgba(229,72,77,0.12);  border-left-color: #e5484d; }
+.team-roster-card.team-color-blue   { background: rgba(59,130,246,0.12); border-left-color: #3b82f6; }
+.team-roster-card.team-color-green  { background: rgba(34,197,94,0.12);  border-left-color: #22c55e; }
+.team-roster-card.team-color-yellow { background: rgba(234,179,8,0.14);  border-left-color: #eab308; }
+.team-roster-card.team-color-purple { background: rgba(168,85,247,0.12); border-left-color: #a855f7; }
+.team-roster-card.team-color-orange { background: rgba(249,115,22,0.13); border-left-color: #f97316; }
+
+.team-standing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 5px solid;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.team-standing-row.team-color-red    { border-left-color: #e5484d; background: rgba(229,72,77,0.08); }
+.team-standing-row.team-color-blue   { border-left-color: #3b82f6; background: rgba(59,130,246,0.08); }
+.team-standing-row.team-color-green  { border-left-color: #22c55e; background: rgba(34,197,94,0.08); }
+.team-standing-row.team-color-yellow { border-left-color: #eab308; background: rgba(234,179,8,0.10); }
+.team-standing-row.team-color-purple { border-left-color: #a855f7; background: rgba(168,85,247,0.08); }
+.team-standing-row.team-color-orange { border-left-color: #f97316; background: rgba(249,115,22,0.09); }
+.team-standing-name { font-weight: 700; }
+.team-standing-members { font-size: 11.5px; opacity: 0.75; flex: 1; }
+
+/* ---- Player Guess Bar (Offline Mode) ---------------------------------
+   Lives on the main game screen (not in Settings) so every player - solo
+   or on a team - can enter a guess the instant they get the phone. Chips
+   let a team player identify themselves; tapping two cards on the board
+   (or typing "id id" below) sends the guess either way. */
+.player-guess-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px 8px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+.player-guess-bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.player-guess-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.player-guess-bar-toggle {
+  background: transparent;
+  border: none;
+  color: var(--cyan);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 5px;
+}
+.player-guess-hint { margin: 0; font-size: 12.5px; transition: color 0.15s ease; }
+.player-guess-hint.attn { color: var(--pink, #ec5f74); animation: guessHintPulse 0.9s ease; }
+@keyframes guessHintPulse {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.04); }
+}
+.player-guess-bar .team-player-chips { margin: 0; gap: 5px; }
+.player-guess-bar .team-player-chip {
+  padding: 7px 12px;
+  font-size: 12.5px;
+  min-height: 32px;
+}
+.player-guess-input-row { margin: 0; }
+.player-guess-input-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 16px; /* 16px stops iOS Safari auto-zooming the page on focus */
+}
+.player-guess-input-row .btn { padding: 10px 16px; font-size: 13.5px; }
+
+/* Collapsed (like the Host Console): the hint text and the type-a-guess
+   row hide, but the player name chips stay visible - just tappable and
+   even smaller, so whoever's turn it is can still identify themselves
+   without the bar taking up space. */
+.player-guess-bar.collapsed .player-guess-hint,
+.player-guess-bar.collapsed .player-guess-input-row { display: none; }
+.player-guess-bar.collapsed .team-player-chip {
+  padding: 5px 10px;
+  font-size: 11.5px;
+  min-height: 26px;
+}
+
+/* Tap-to-guess on the board: face-down, unmatched cards get a pointer
+   cursor in Offline Mode, and a tapped-but-not-yet-submitted card gets a
+   bright ring so the player can see what they've picked before the
+   second tap completes the guess. */
+.memory-grid.offline-tap-mode .card:not(.flipped):not(.matched) { cursor: pointer; }
+.card.tap-selected .card-back {
+  box-shadow:
+    0 0 0 3px var(--cyan, #22d3ee),
+    0 2px 0 rgba(0,0,0,0.14),
+    0 4px 9px rgba(0,0,0,0.18),
+    inset 0 1px 1px rgba(255,255,255,0.5);
+}
+
+/* ---- Team total badge --------------------------------------------------
+   Shown next to a team player's OWN score (This Round lists, the live
+   top-5 scoreboard, round-end windows, and the real-time guess pop-up) so
+   their team's running total is always visible right alongside it. Reuses
+   the .team-color-* palette already defined above for chips/rosters. */
+.team-total-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.5;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.team-total-badge-lg { font-size: 12px; padding: 3px 10px; }
+
+
+/* ===== platform layout glue ===== */
+.stage { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 640px; margin: 0 auto; padding: 4px 10px; }
+.round-card { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.round-card > * { flex: 0 0 auto; margin-top: 0; margin-bottom: 0; }
+html.fs body .app > .stage > .round-card > .gridWrap, .round-card > .gridWrap { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.gridWrap .memory-grid { height: 100%; width: auto !important; max-width: 100%; max-height: 100%; aspect-ratio: var(--cols) / var(--rows); }
+.round-card .puzzle-topline { justify-content: center; flex-wrap: wrap; }
+.toastSlot { position: relative; }
+.toastSlot .live-guess-toast-area { position: absolute; left: 0; right: 0; top: 0; min-height: 0; margin: 0; pointer-events: none; display: flex; justify-content: center; }
+.details-toggle { display: none; }
+.details-panel { display: flex; flex-direction: column; gap: 8px; }
+.details-panel[hidden] { display: none; }
+.host-console-bar { position: static; flex: 0 0 auto; }
+.mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.highlight { background: var(--legend-bg); border-radius: 4px; padding: 0 4px; }
+.status-line { font-size: 12px; margin-top: 6px; }
+.timing-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.theme-picker { display: flex; align-items: center; gap: 8px; }
+.field-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.field-row > * { flex: 1 1 120px; min-width: 0; }
+.pickerOption.mode-btn.active .pickerRadio { border-color: var(--gold); }
+.pickerOption.mode-btn.active .pickerRadio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--gold); }
+.player-guess-bar { margin: 0; }
+@media (max-height: 760px) { .live-score-list li:nth-child(n+4) { display: none; } }
+@media (max-height: 700px) { .live-scoreboard { display: none; } .quick-hint { display: none; } }
+html.fs body .app > .stage > .round-card, .app > .stage > .round-card { width: 100%; max-width: 640px; margin-left: auto; margin-right: auto; }
+.round-card .puzzle-topline, .round-card .live-scoreboard, .round-card .player-guess-bar { width: 100%; box-sizing: border-box; }
+.round-card .live-scoreboard { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
