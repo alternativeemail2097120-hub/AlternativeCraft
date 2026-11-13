@@ -1207,7 +1207,6 @@ io.on('connection', function (socket) {
 // ---- Platform integration (update 146) ---------------------------------------------------------------------------
 app.use(MOUNT, router);
 router.use(express.static(path.join(__dirname, 'public'), { index: 'blossom-index.html' }));
-app.get(MOUNT, function (req, res) { res.redirect(MOUNT + '/'); });
 
 import('../shared/platform-hub.js').then(function (m) {
   m.PlatformHub.registerGame('blossom', async function (user) {

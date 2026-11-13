@@ -767,7 +767,6 @@ app.get(MOUNT + '/avatar/:id', async (req, res) => {
 });
 
 // No-cache headers so phones always fetch the newest files after a deploy.
-app.get(MOUNT, (req, res) => res.redirect(MOUNT + '/'));
 app.use(MOUNT, require('express').static(path.join(__dirname, 'public'), {
   index: 'memory-index.html',
   etag: false,
