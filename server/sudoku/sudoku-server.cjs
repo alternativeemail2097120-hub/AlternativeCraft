@@ -1360,7 +1360,6 @@ app.get(MOUNT + "/avatar-debug", function (req, res) {
 // Cache-Control headers below make sure that every time you redeploy, phones
 // and browsers always fetch the newest index.html/style.css/game.js instead
 // of silently reusing an old cached copy from a previous deploy.
-app.get(MOUNT, function (req, res) { res.redirect(MOUNT + "/"); });
 app.use(MOUNT, require("express").static(path.join(__dirname, "public"), {
   index: "sudoku-index.html",
   etag: false,

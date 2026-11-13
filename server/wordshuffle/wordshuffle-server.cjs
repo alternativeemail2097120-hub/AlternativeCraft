@@ -450,7 +450,6 @@ router.get('/avatar', async (req, res) => {
 });
 router.use(express.static(dist, { index: 'wordshuffle-index.html' }));
 app.use(MOUNT, router);
-app.get(MOUNT, (req, res) => res.redirect(MOUNT + '/'));
 
 startRound();
 connectTikTok();   // only acts in Live mode
