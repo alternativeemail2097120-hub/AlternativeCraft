@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, minimum-scale=1, user-scalable=no" />
+<title>SUDOKU — Live Number Puzzle</title>
+<meta name="description" content="A live Sudoku puzzle solved together by TikTok LIVE chat." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Fredoka:wght@400;500;600;700&family=Baloo+2:wght@500;700&family=Lilita+One&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/shared/theme.css" />
+<script src="/shared/theme.js"></script>
+<script src="/shared/session.js"></script>
+<script src="/shared/platform-sync.js"></script>
+<link rel="stylesheet" href="sudoku-style.css" />
+<link rel="stylesheet" href="/shared/game-chrome.css" />
+<link rel="stylesheet" href="/shared/settings-shell.css" />
+<script src="/shared/title-font.js" defer></script>
+<script src="/shared/score-ticker.js"></script>
+<script src="/shared/settings-shell.js"></script>
+<link rel="stylesheet" href="/shared/fit-screen.css" />
+<script src="/shared/fit-screen.js"></script>
+</head>
+<body data-game="sudoku">
+  <div class="confettiLayer" id="confettiLayer" aria-hidden="true"></div>
+
+  <div class="app" id="app">
+    <!-- Small message bar (score reset done, backup restored, etc.) -->
+    <div id="hostNoticeBar" class="host-notice-bar" role="status" aria-live="polite" hidden></div>
+
+    <div class="heroBand" id="heroBand">
+      <h1 class="heroTitle">SUDOKU</h1>
+      <p class="heroTagline">Solve the puzzle together! Chat types a cell and a digit, like A5 7, and the grid fills in live.</p>
+    </div>
+
+    <header class="topbar">
+      <div class="brandRow">
+        <span class="brandDot" id="brandDot"></span>
+        <div class="brandText">
+          <div class="brandTitle">SUDOKU</div>
+          <div class="brandSubtitle">chat-powered puzzle</div>
+        </div>
+      </div>
+      <div class="toolbarRow">
+        <a href="/" class="iconBtn" id="homeBtn" aria-label="Choose another game">🏠</a>
+        <span class="modeBadge" id="modeBadge">OFFLINE</span>
+        <div class="toolbar-dropdown" id="difficultyDropdown">
+          <button type="button" id="difficultyDropdownBtn" class="iconBtn toolbar-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Difficulty: Moderate" title="Difficulty: Moderate">
+            <span id="difficultyDropdownIcon" class="diff-badge level-3">3</span>
+          </button>
+          <ul id="difficultyDropdownMenu" class="toolbar-dropdown-menu" role="listbox" aria-label="Difficulty" hidden>
+            <li role="option" data-value="very-easy" aria-selected="false"><span class="diff-badge level-1">1</span><span class="dd-label">Very Easy</span></li>
+            <li role="option" data-value="easy" aria-selected="false"><span class="diff-badge level-2">2</span><span class="dd-label">Easy</span></li>
+            <li role="option" data-value="moderate" aria-selected="true" class="dd-active"><span class="diff-badge level-3">3</span><span class="dd-label">Moderate</span></li>
+            <li role="option" data-value="hard" aria-selected="false"><span class="diff-badge level-4">4</span><span class="dd-label">Hard</span></li>
+            <li role="option" data-value="very-hard" aria-selected="false"><span class="diff-badge level-5">5</span><span class="dd-label">Very Hard</span></li>
+            <li role="option" data-value="extreme" aria-selected="false"><span class="diff-badge level-6">6</span><span class="dd-label">Extreme</span></li>
+            <li role="option" data-value="extremely-hard" aria-selected="false"><span class="diff-badge level-7">7</span><span class="dd-label">Extremely Hard</span></li>
+          </ul>
+        </div>
+        <button class="iconBtn" id="newPuzzleTopBtn" type="button" aria-label="New puzzle" title="New puzzle">↻</button>
+        <button class="iconBtn" id="helpBtn" type="button" aria-label="How to play">❓</button>
+        <button class="iconBtn" id="leaderboardTopBtn" type="button" aria-label="Leaderboard">🏆</button>
+        <button class="iconBtn" id="settingsBtn" type="button" aria-label="Settings">⚙️</button>
+        <button class="iconBtn" id="fullscreenBtn" type="button" aria-label="Enter fullscreen">⛶</button>
+      </div>
+    </header>
+
+    <div class="toastSlot"><div id="liveGuessToastArea" class="live-guess-toast-area" aria-live="polite"></div></div>
+
+    <main class="stage" id="stage">
+      <section class="round-card">
+        <div class="quick-hint">Chat format: <span class="mono highlight">A5 7</span> puts <b>7</b> in <b>Row A, Column 5</b></div>
+
+        <div class="puzzle-topline">
+          <span id="liveStatusMini" class="live-status-mini status-idle">&#9679; Offline</span>
+          <span id="roundPointsMini" class="live-status-mini round-points-mini" title="Total points awarded so far this round">&#127942; 0 pt this round</span>
+          <span id="stopwatch" class="stopwatch" title="Time elapsed - there is no time limit">&#9201; 00:00</span>
+          <span id="solvedBanner" class="solved-banner" hidden>SOLVED!</span>
+        </div>
+        <div id="autoNextCountdown" class="auto-next-countdown" hidden></div>
+
+        <div class="gridWrap"><div id="sudokuGrid" class="sudoku-grid"></div></div>
+
+        <div class="live-scoreboard" id="liveScoreboard">
+          <div class="live-score-col"><h3>&#127942; This Round</h3><ol id="liveRoundList" class="live-score-list"></ol></div>
+          <div class="live-score-col"><h3>&#11088; All-Time</h3><ol id="liveAllTimeList" class="live-score-list"></ol></div>
+        </div>
+      </section>
+    </main>
+
+    <button id="hostConsoleShowBtn" class="host-console-show-btn" type="button" aria-label="Show host console" hidden>&#9000; Console</button>
+    <footer class="host-console-bar" id="hostConsoleBar">
+      <div class="host-console-head">
+        <span class="host-console-label">Host Console</span>
+        <button id="hostConsoleToggle" class="host-console-toggle" type="button" aria-label="Hide host console">&#9660; Hide</button>
+      </div>
+      <div class="host-console-row" id="hostConsoleRow">
+        <input id="hostConsoleInput" type="text" placeholder="Host console: A5 7" autocomplete="off">
+        <button id="hostConsoleBtn" class="btn btnGold" type="button">Send</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Round-end floating windows -->
+  <div id="roundEndOverlay" class="round-end-overlay" hidden>
+    <div class="round-end-card">
+      <div class="round-end-head">
+        <h2 id="roundEndTitle">Round Results</h2>
+        <button id="roundEndCloseBtn" class="iconBtn" type="button" aria-label="Close">✕</button>
+      </div>
+      <ol id="roundEndList" class="round-end-list"></ol>
+      <div id="roundEndCountdown" class="round-end-countdown" hidden></div>
+    </div>
+  </div>
+
+  <!-- Leaderboard drawer -->
+  <div class="drawerOverlay" id="leaderboardOverlay" hidden>
+    <div class="drawer">
+      <div class="drawerHead">
+        <h3>Leaderboard</h3>
+        <button class="iconBtn" id="leaderboardModalCloseBtn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="tabRow">
+        <button type="button" class="tabBtn lb-modal-tab active" data-lb-tab="round">This round</button>
+        <button type="button" class="tabBtn lb-modal-tab" data-lb-tab="alltime">All-time</button>
+      </div>
+      <button id="lbResetBtn" type="button" class="btn btnDanger btnFull lb-reset-btn">Reset scores in this tab</button>
+      <ol id="leaderboardModalRoundList" class="round-end-list"></ol>
+      <ol id="leaderboardModalAllTimeList" class="round-end-list capped-20" hidden></ol>
+    </div>
+  </div>
+
+  <!-- Settings drawer (turned into the platform settings workspace by /shared/settings-shell.js) -->
+  <div class="drawerOverlay" id="settingsOverlay" hidden>
+    <div class="drawer">
+      <div class="drawerHead">
+        <h3>Settings</h3>
+        <button class="iconBtn" id="closeSettings" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <div class="statusChips">
+        <div class="statusChip" id="modeChip">Mode: —</div>
+        <div class="statusChip" id="connChip">TikTok: not connected</div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Appearance</h4>
+        <p class="sectionNote">Pick the platform color or one of the cute "Box colors &amp; looks" designs. It is shared by every game.</p>
+        <label class="theme-picker">
+          🎨
+          <select data-theme-select aria-label="Platform theme color">
+            <option value="cream">Cream</option>
+            <option value="blue">Sky Blue</option>
+            <option value="green">Meadow Green</option>
+            <option value="pink">Blossom Pink</option>
+            <option value="violet">Lavender Violet</option>
+            <option value="honey">Honey Gold</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Title font</h4>
+        <p class="sectionNote">Pick the font used for the game name at the top of the screen. Saved on this device and shared by every game.</p>
+        <div data-title-font-picker></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Mode</h4>
+        <button class="pickerRow" id="modePickerBtn" type="button">
+          <span id="modePickerLabel">Offline — host plays solo</span>
+          <span class="chev">▾</span>
+        </button>
+      </div>
+
+      <div class="drawerSection" data-panel="live" id="tiktokSection" hidden>
+        <h4>TikTok auto-chat</h4>
+        <p class="sectionNote" id="liveKeyHintDefault" hidden>A Sign API Key is already configured on the server - just enter your TikTok username and hit Connect.</p>
+        <p class="sectionNote" id="liveKeyHintManual">Connects to your LIVE room and feeds real chat answers into the puzzle. Needs a Sign API Key (set on the server, or typed below).</p>
+        <label class="fieldLabel">Your TikTok username</label>
+        <input id="tiktokUsername" class="textInput" placeholder="e.g. yourhandle (no @)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <input id="signApiKey" class="textInput" type="password" placeholder="EulerStream Sign API Key" autocomplete="off" />
+        <div class="row">
+          <button id="connectLiveBtn" class="btn btnGold" type="button">Connect</button>
+          <button id="disconnectLiveBtn" class="btn btnGhost" type="button">Disconnect</button>
+        </div>
+        <div id="liveStatus" class="status-line status-idle">Not connected.</div>
+      </div>
+
+      <div class="drawerSection" data-panel="test" hidden>
+        <h4>Test tools</h4>
+        <p class="sectionNote">No login needed. Use this to try the game before going live.</p>
+        <div class="row"><button id="simulateBtn" class="btn btnGold" type="button">Simulate random fake chat</button></div>
+        <input id="testCustomText" class="textInput" type="text" placeholder="Or type a fake comment, e.g. A5 7" />
+        <div class="row"><button id="testCustomBtn" class="btn btnGhost" type="button">Send as fake viewer</button></div>
+        <label class="switchRow">
+          <input type="checkbox" id="botAutoSolveToggle" />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Auto-solve (bots) <small>A few bots keep answering random cells until the puzzle is complete.</small></span>
+        </label>
+      </div>
+
+      <div class="drawerSection" data-panel="offline">
+        <h4>Offline play</h4>
+        <p class="sectionNote">Play the board yourself. Enter answers below.</p>
+        <input id="offlineGuessInput" class="textInput" type="text" placeholder="Your guess, e.g. A5 7" autocomplete="off" />
+        <div class="row"><button id="offlineGuessBtn" class="btn btnGold" type="button">Submit</button></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Puzzle</h4>
+        <label class="fieldLabel" for="difficultySelect">Difficulty</label>
+        <select id="difficultySelect" class="textInput">
+          <option value="very-easy">Very Easy</option>
+          <option value="easy">Easy</option>
+          <option value="moderate" selected>Moderate</option>
+          <option value="hard">Hard</option>
+          <option value="very-hard">Very Hard</option>
+          <option value="extreme">Extreme</option>
+          <option value="extremely-hard">Extremely Hard</option>
+        </select>
+        <div class="row"><button id="newPuzzleBtn" class="btn btnGhost" type="button">New puzzle</button></div>
+        <label class="switchRow">
+          <input type="checkbox" id="autoNextToggle" />
+          <span class="switchTrack"><span class="switchThumb"></span></span>
+          <span class="switchLabel">Auto next round <small>Starts a new puzzle a few seconds after each solve.</small></span>
+        </label>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Floating window timing</h4>
+        <p class="sectionNote">How long each floating window stays on screen, and how long until the next round auto-starts. Saved on this device (the next-round delay is shared with all viewers).</p>
+        <div class="timing-grid">
+          <label class="timing-field">Live guess toast (sec)<input type="number" id="toastDurationInput" class="textInput" min="1" max="20" step="0.5"></label>
+          <label class="timing-field">Round scorers window (sec)<input type="number" id="roundWindowDurationInput" class="textInput" min="2" max="60" step="1"></label>
+          <label class="timing-field">All-time window (sec)<input type="number" id="allTimeWindowDurationInput" class="textInput" min="2" max="60" step="1"></label>
+          <label class="timing-field">Next round delay (sec)<input type="number" id="autoNextDelayInput" class="textInput" min="3" max="300" step="1"></label>
+        </div>
+        <div class="row"><button id="resetTimingBtn" type="button" class="btn btnGhost">Reset to defaults</button></div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Hints &amp; reveals</h4>
+        <p class="sectionNote">Instantly fill in answers. Revealed cells never award viewer points.</p>
+        <div class="row">
+          <button id="revealCellBtn" class="btn btnGhost" type="button">Reveal 1 cell</button>
+          <button id="revealBoxBtn" class="btn btnGhost" type="button">Reveal 3×3 box</button>
+        </div>
+        <button id="revealBoardBtn" class="btn btnDanger btnFull" type="button">Reveal whole board</button>
+      </div>
+
+      <button type="button" id="applyBtn" class="btn btnGold btnFull">💾 Save &amp; apply settings</button>
+      <div id="saveSettingsConfirm" class="save-settings-confirm" hidden></div>
+
+      <div class="drawerSection">
+        <h4>Saved defaults</h4>
+        <button type="button" id="saveDefaultSettingsBtn" class="btn btnGhost btnFull">🌟 Save &amp; apply as default</button>
+        <p class="sectionNote">Remembers Mode, Difficulty, Auto Next Round (and its delay), Bot Auto-Solve and your TikTok username on this device, and re-applies them every time this page loads. <button type="button" id="clearDefaultSettingsBtn" class="linkBtn">Clear saved default</button></p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Activity &amp; diagnostics</h4>
+        <button id="detailsToggle" class="linkBtn" type="button">Hide leaderboard &amp; activity</button>
+        <div id="detailsPanel" class="details-panel">
+          <div class="feed-box"><h3>Recent answers</h3><ul id="feedList"></ul></div>
+          <div class="leaderboard-box"><h3>This round (1 pt / correct)</h3><ol id="leaderboardList"></ol></div>
+          <div class="diagnostics-box">
+            <h3>Diagnostics</h3>
+            <div>All raw events: <span id="rawEventCount">0</span></div>
+            <div>Last received: <span id="lastReceived">(none yet)</span></div>
+            <div>Scores saved: <span id="lastSavedText">(checking...)</span></div>
+          </div>
+          <div class="leaderboard-box"><h3>All-time leaderboard</h3><ol id="allTimeLeaderboardList"></ol></div>
+        </div>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Scores</h4>
+        <p class="sectionNote">Clears a leaderboard for everyone. This cannot be undone. (Resetting the round keeps everyone's all-time points.)</p>
+        <button id="resetRoundBtn" type="button" class="btn btnDanger btnFull">Reset this round's leaderboard</button>
+        <button id="resetAllTimeBtn" type="button" class="btn btnDanger btnFull">Reset all-time leaderboard</button>
+      </div>
+
+      <div class="drawerSection storage-box">
+        <h4>Score storage &amp; backup</h4>
+        <div id="storageStatus" class="storage-status storage-unknown">Checking...</div>
+        <p class="sectionNote" id="storageHint"></p>
+        <div class="row">
+          <a id="backupDownloadBtn" class="btn btnGhost btn-link" href="/sudoku/api/alltime-backup" download>⬇ Download backup</a>
+          <button id="backupRestoreBtn" type="button" class="btn btnGhost">⬆ Restore backup</button>
+        </div>
+        <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
+        <p class="sectionNote">Tip: download a backup after a big stream. Restoring never lowers anyone's total.</p>
+      </div>
+
+      <div class="drawerSection">
+        <h4>Live event tools</h4>
+        <div data-engagement-tools></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mode picker popup -->
+  <div class="pickerOverlay" id="modePickerOverlay" hidden>
+    <div class="pickerSheet">
+      <button class="pickerOption mode-btn" data-mode="live" type="button"><span class="pickerRadio"></span><span class="pickerTextWrap"><span class="pickerTitle">Live</span><span class="pickerDesc">Counts for the chat leaderboard</span></span></button>
+      <button class="pickerOption mode-btn" data-mode="test" type="button"><span class="pickerRadio"></span><span class="pickerTextWrap"><span class="pickerTitle">Test</span><span class="pickerDesc">Practice with fake chat</span></span></button>
+      <button class="pickerOption mode-btn" data-mode="offline" type="button"><span class="pickerRadio"></span><span class="pickerTextWrap"><span class="pickerTitle">Offline</span><span class="pickerDesc">Host plays solo</span></span></button>
+    </div>
+  </div>
+
+  <!-- How-to-play modal -->
+  <div class="modalOverlay" id="howToOverlay" hidden>
+    <div class="modal">
+      <div class="modalHead">
+        <h3>How to play</h3>
+        <button class="iconBtn" id="closeHowTo" type="button" aria-label="Close">✕</button>
+      </div>
+      <ul class="howToList">
+        <li>Type your answer as <strong>COORDINATE + NUMBER</strong>, e.g. <span class="mono highlight">A5 7</span> puts a <b>7</b> in <b>Row A, Column 5</b>.</li>
+        <li>Rows are letters <b>A-I</b> (top to bottom); columns are numbers <b>1-9</b> (left to right). No punctuation needed.</li>
+        <li>Each correct guess earns <b>1 point</b>. There is no time limit - the clock just shows how long the puzzle takes.</li>
+        <li><strong>The puzzle:</strong> a 9×9 grid in nine 3×3 boxes. Fill every empty cell with 1-9 so each row, column and box has no repeats. Pre-filled "givens" are clues and can't be changed.</li>
+        <li>💡 Scan a row, column or box for the digit it is <b>missing</b>, then find the only cell it can legally go in.</li>
+        <li><strong>Live</strong> = real TikTok chat. <strong>Test</strong> = simulated chat. <strong>Offline</strong> = just you, type answers directly.</li>
+      </ul>
+      <button class="btn btnGold" id="closeHowTo2" type="button">Got it</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/engagement.js"></script>
+  <script src="sudoku-game.js"></script>
+</body>
+</html>
